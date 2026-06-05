@@ -730,9 +730,228 @@ video {
   margin-bottom: 8px;
   box-shadow: 0 0 10px var(--accent-cyan-glow);
   transition: all 0.2s;
+  z-index: 2;
 }
 
 #pwa-install-btn:hover {
   background: rgba(6, 182, 212, 0.2);
   transform: translateY(-1px);
 }
+
+/* ==========================================
+ * ESTILOS DE PORTAL DE MENÚ PRINCIPAL (SPA)
+ * ========================================== */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  width: 100%;
+  max-width: 450px;
+  padding: 4px;
+  margin-bottom: 24px;
+  z-index: 2;
+}
+
+.dashboard-card {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  background: rgba(22, 28, 48, 0.8);
+}
+
+.dashboard-card:active {
+  transform: translateY(1px);
+}
+
+.dashboard-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bg-gradient-blue {
+  background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+}
+
+.bg-gradient-purple {
+  background: linear-gradient(135deg, #6d28d9 0%, #a855f7 100%);
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+}
+
+.bg-gradient-cyan {
+  background: linear-gradient(135deg, #0e7490 0%, #06b6d4 100%);
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+}
+
+.bg-gradient-green {
+  background: linear-gradient(135deg, #047857 0%, #10b981 100%);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+.dashboard-card-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-card-content h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.dashboard-card-content p {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.dashboard-card-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================
+ * ESTILOS DE SUB-VISTAS
+ * ========================================== */
+
+.sub-view {
+  transition: opacity 0.3s ease;
+}
+
+.sub-view-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 12px;
+}
+
+.btn-back-sub {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-back-sub:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ==========================================
+ * ESTILOS DE GRID DE PERSONAJES
+ * ========================================== */
+
+.character-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-top: 10px;
+}
+
+.character-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.character-grid::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.character-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+.character-card {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  text-align: center;
+}
+
+.character-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.character-card.active {
+  background: rgba(6, 182, 212, 0.08);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan-glow);
+}
+
+.character-card-icon {
+  font-size: 22px;
+  margin-bottom: 6px;
+  background: rgba(255,255,255,0.02);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.character-card.active .character-card-icon {
+  background: rgba(6,182,212,0.1);
+  color: var(--accent-cyan);
+}
+
+.character-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.character-card-file {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+

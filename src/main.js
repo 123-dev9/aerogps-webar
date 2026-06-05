@@ -69,6 +69,21 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
+  // Generar lista de personajes animada dinámicamente en el HTML
+  const characterContainer = document.getElementById('character-list-container');
+  if (characterContainer) {
+    characterContainer.innerHTML = assetService.getCatalog().map((model, idx) => {
+      const emoji = getEmojiForModel(model.id);
+      return `
+        <div class="character-card ${model.id === 'Dragon' ? 'active' : ''}" onclick="selectCharacter('${model.id}')" id="char-card-${model.id}">
+          <div class="character-card-icon">${emoji}</div>
+          <div class="character-card-name">${model.name}</div>
+          <div class="character-card-file">${model.file}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
   // Cargar base de datos local de monumentos e iniciar el mapa
   monumentsService.loadMonuments().then(() => {
     mapController = new MapController(gpsService, monumentsService, startARForMonument);
@@ -85,6 +100,76 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   );
 });
+
+// Helper de iconos emoji para el catálogo
+function getEmojiForModel(id) {
+  switch (id) {
+    case 'Chair': return '🪑';
+    case 'GeoPlanter': return '🪴';
+    case 'Dragon': return '🐉';
+    case 'charizard_flying_animation': return '🔥';
+    case 'FerrisWheel': return '🎡';
+    case 'Bat': return '🦇';
+    case 'toon-bat': return '🦇';
+    case 'Sweeper': return '🤖';
+    case 'girl_look_around': return '👩';
+    case 'paul_talking_business': return '👨';
+    case 'pokemon_3ds_meowth': return '🐱';
+    case 'pokemon_3ds_scizor': return '✂️';
+    case 'pokemon_pokedex_3d_pro_infernape': return '🐒';
+    default: return '📦';
+  }
+}
+
+// ==========================================
+// Ruteador y Navegación SPA
+// ==========================================
+
+function switchView(viewId) {
+  // Ocultar todas las sub-vistas del panel principal
+  document.getElementById('dashboard-view').style.display = 'none';
+  document.getElementById('map-view').style.display = 'none';
+  document.getElementById('character-view').style.display = 'none';
+  document.getElementById('sandbox-view').style.display = 'none';
+
+  const specialDemos = document.getElementById('special-demos-view');
+  const galleryTitle = document.getElementById('gallery-title');
+  if (specialDemos) specialDemos.style.display = 'none';
+  if (galleryTitle) galleryTitle.style.display = 'none';
+
+  // Mostrar la vista objetivo
+  if (viewId === 'dashboard') {
+    document.getElementById('dashboard-view').style.display = 'grid';
+    if (specialDemos) specialDemos.style.display = 'grid';
+    if (galleryTitle) galleryTitle.style.display = 'flex';
+  } else {
+    const targetView = document.getElementById(`${viewId}-view`);
+    if (targetView) {
+      targetView.style.display = 'block';
+    }
+  }
+
+  // Si abrimos la vista del mapa, necesitamos forzar el redimensionado en MapLibre GL
+  if (viewId === 'map' && mapController && mapController.map) {
+    setTimeout(() => {
+      mapController.map.resize();
+    }, 100);
+  }
+
+  // Refrescar iconos Lucide inyectados
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// Control del personaje seleccionado
+let selectedCharacterId = 'Dragon';
+
+function selectCharacter(id) {
+  selectedCharacterId = id;
+  document.querySelectorAll('.character-card').forEach(card => card.classList.remove('active'));
+  const activeCard = document.getElementById(`char-card-${id}`);
+  if (activeCard) activeCard.classList.add('active');
+  console.log(`[Main] Personaje seleccionado: ${id}`);
+}
 
 // ==========================================
 // Handlers de la vista HTML (Configuración / Onclick)
@@ -182,7 +267,7 @@ function startAR() {
 }
 
 /**
- * Inicia la escena de Realidad Aumentada para un Monumento específico
+ * Inicia la escena de Realidad Aumentada para un Monumento o Personaje específico
  */
 function startARForMonument(monument) {
   // Si el mapa está abierto, ocultar panel de detalles
@@ -204,7 +289,18 @@ function startARForMonument(monument) {
 
   // Cargar A-Scene de 8th Wall dinámicamente
   const sceneContainer = document.getElementById('scene-container');
-  const modelFile = monument.modelo; // ej. Chair o GeoPlanter
+  let modelFile = monument.modelo; // ej. Chair o Dragon
+  if (!modelFile.endsWith('.glb')) {
+    modelFile = `${modelFile}.glb`;
+  }
+
+  const defaultScaleVal = monument.defaultScale ? monument.defaultScale.x : 15;
+  const defaultElevationVal = monument.defaultElevation !== undefined ? monument.defaultElevation : 0;
+  const scaleAttr = `${defaultScaleVal} ${defaultScaleVal} ${defaultScaleVal}`;
+  
+  // Comprobar si es un modelo animado
+  const isAnimated = monument.isAnimated || (monument.id !== 'Chair' && monument.id !== 'GeoPlanter');
+  const animationMixerAttr = isAnimated ? 'animation-mixer' : '';
 
   sceneContainer.innerHTML = `
     <a-scene
@@ -213,7 +309,7 @@ function startARForMonument(monument) {
       renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
     >
       <a-assets>
-        <a-asset-item id="model-3d" src="./assets/${modelFile}.glb"></a-asset-item>
+        <a-asset-item id="model-3d" src="./assets/${modelFile}"></a-asset-item>
       </a-assets>
 
       <!-- Indicador visual del suelo detectado por 8th Wall -->
@@ -225,9 +321,10 @@ function startARForMonument(monument) {
       <a-entity
         id="ar-entity-model"
         gltf-model="#model-3d"
-        anchor-manager="lat: ${monument.lat}; lng: ${monument.lng}; elevation: 0;"
-        gesture-controls="minScale: 2; maxScale: 150;"
-        scale="15 15 15"
+        anchor-manager="lat: ${monument.lat}; lng: ${monument.lng}; elevation: ${defaultElevationVal};"
+        gesture-controls="minScale: ${defaultScaleVal * 0.1}; maxScale: ${defaultScaleVal * 10};"
+        scale="${scaleAttr}"
+        ${animationMixerAttr}
       ></a-entity>
 
       <a-camera position="0 1.6 0" raycaster="objects: #ar-entity-model" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
@@ -267,6 +364,148 @@ function startARForMonument(monument) {
   }, 500);
 }
 
+/**
+ * Inicia la AR para el personaje animado seleccionado
+ */
+function startCharacterAR() {
+  const model = assetService.getCatalog().find(m => m.id === selectedCharacterId);
+  if (!model) return;
+
+  const userLat = gpsService.userCoords.lat !== null ? gpsService.userCoords.lat : 41.296611;
+  const userLng = gpsService.userCoords.lng !== null ? gpsService.userCoords.lng : 2.760382;
+
+  const virtualMonument = {
+    id: model.id,
+    nombre: model.name,
+    lat: userLat,
+    lng: userLng,
+    modelo: model.id,
+    defaultScale: model.defaultScale,
+    defaultElevation: model.defaultElevation,
+    isAnimated: true
+  };
+
+  startARForMonument(virtualMonument);
+}
+
+/**
+ * Inicia la escena del Multiverso AR con 4 modelos distribuidos
+ */
+function startMultiversoAR() {
+  if (mapController) mapController.hideDrawer();
+
+  const centerLat = gpsService.userCoords.lat !== null ? gpsService.userCoords.lat : 41.296611;
+  const centerLng = gpsService.userCoords.lng !== null ? gpsService.userCoords.lng : 2.760382;
+
+  gpsService.setTarget(centerLat, centerLng);
+  loaderController.show("Iniciando Multiverso 3D (4 objetos animados)...");
+
+  // Distribuir 4m en direcciones cardinales
+  const latOffset = 4 / 111111;
+  const lngOffset = 4 / (111111 * Math.cos(centerLat * Math.PI / 180));
+
+  const northLat = centerLat + latOffset, northLng = centerLng;
+  const southLat = centerLat - latOffset, southLng = centerLng;
+  const eastLat = centerLat, eastLng = centerLng + lngOffset;
+  const westLat = centerLat, westLng = centerLng - lngOffset;
+
+  const sceneContainer = document.getElementById('scene-container');
+  sceneContainer.innerHTML = `
+    <a-scene
+      xrweb="disableWorldTracking: false"
+      embedded
+      renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+    >
+      <a-assets>
+        <a-asset-item id="model-dragon" src="./assets/Dragon.glb"></a-asset-item>
+        <a-asset-item id="model-ferris" src="./assets/FerrisWheel.glb"></a-asset-item>
+        <a-asset-item id="model-bat" src="./assets/Bat.glb"></a-asset-item>
+        <a-asset-item id="model-sweeper" src="./assets/Sweeper.glb"></a-asset-item>
+      </a-assets>
+
+      <!-- Indicador visual del suelo detectado por 8th Wall -->
+      <a-entity ground-indicator id="reticle">
+        <a-ring color="#06b6d4" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+      </a-entity>
+
+      <!-- OBJETO 1: Dragón (4m al Norte) -->
+      <a-entity
+        id="entity-dragon"
+        gltf-model="#model-dragon"
+        anchor-manager="lat: ${northLat}; lng: ${northLng}; elevation: 1.2;"
+        gesture-controls="minScale: 0.05; maxScale: 15; sensitivity: 0.005;"
+        scale="0.6 0.6 0.6"
+        animation-mixer
+      >
+        <a-text value="Dragon Volador" position="0 2.2 0" align="center" color="#06b6d4" width="4" wrap-count="15"></a-text>
+      </a-entity>
+
+      <!-- OBJETO 2: Noria (4m al Sur) -->
+      <a-entity
+        id="entity-ferris"
+        gltf-model="#model-ferris"
+        anchor-manager="lat: ${southLat}; lng: ${southLng}; elevation: 0;"
+        gesture-controls="minScale: 0.01; maxScale: 5; sensitivity: 0.002;"
+        scale="0.15 0.15 0.15"
+        animation-mixer
+      >
+        <a-text value="Noria Gigante" position="0 3.2 0" align="center" color="#10b981" width="4" wrap-count="15"></a-text>
+      </a-entity>
+
+      <!-- OBJETO 3: Murciélago (4m al Este) -->
+      <a-entity
+        id="entity-bat"
+        gltf-model="#model-bat"
+        anchor-manager="lat: ${eastLat}; lng: ${eastLng}; elevation: 1.5;"
+        gesture-controls="minScale: 0.05; maxScale: 15; sensitivity: 0.005;"
+        scale="0.6 0.6 0.6"
+        animation-mixer
+      >
+        <a-text value="Murcielago" position="0 1.2 0" align="center" color="#f43f5e" width="4" wrap-count="15"></a-text>
+      </a-entity>
+
+      <!-- OBJETO 4: Robot Barredor (4m al Oeste) -->
+      <a-entity
+        id="entity-sweeper"
+        gltf-model="#model-sweeper"
+        anchor-manager="lat: ${westLat}; lng: ${westLng}; elevation: 0;"
+        gesture-controls="minScale: 0.05; maxScale: 15; sensitivity: 0.005;"
+        scale="0.6 0.6 0.6"
+        animation-mixer
+      >
+        <a-text value="Robot Barredor" position="0 1.5 0" align="center" color="#a855f7" width="4" wrap-count="15"></a-text>
+      </a-entity>
+
+      <a-camera position="0 1.6 0" raycaster="objects: #entity-dragon, #entity-ferris, #entity-bat, #entity-sweeper" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+    </a-scene>
+  `;
+
+  document.getElementById('config-screen').style.opacity = '0';
+  setTimeout(() => {
+    document.getElementById('config-screen').style.display = 'none';
+    sceneContainer.style.display = 'block';
+
+    hudController = new HUDController(gpsService, telemetryService, assetService, stopAR);
+    hudController.show();
+    
+    const hudModelName = document.getElementById('hud-model-name');
+    if (hudModelName) hudModelName.innerText = "Multiverso 3D";
+
+    tutorialController.show();
+
+    const firstEntity = document.getElementById('entity-dragon');
+    if (firstEntity) {
+      firstEntity.addEventListener('anchor-placed', () => {
+        loaderController.hide();
+      }, { once: true });
+    }
+
+    setTimeout(() => {
+      loaderController.hide();
+    }, 5000);
+  }, 500);
+}
+
 function stopAR() {
   loaderController.show("Cerrando visor de cámara...");
 
@@ -298,9 +537,13 @@ function stopAR() {
   }, 100);
 }
 
-// Exportar al objeto global window
+// Exportar al objeto global window para enlaces HTML
 window.selectModel = selectModel;
 window.getCurrentGPS = getCurrentGPS;
 window.setOffsetGPS = setOffsetGPS;
 window.startAR = startAR;
 window.stopAR = stopAR;
+window.switchView = switchView;
+window.selectCharacter = selectCharacter;
+window.startCharacterAR = startCharacterAR;
+window.startMultiversoAR = startMultiversoAR;

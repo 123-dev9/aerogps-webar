@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Holograma Sci-Fi Tactical HUD</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+		<style>
+			:root {
+				--neon-green: #39ff14;
+				--neon-green-glow: rgba(57, 255, 20, 0.3);
+				--cyber-bg: rgba(6, 12, 8, 0.85);
+			}
+
+			/* HUD Holográfico Ciberpunk */
+			.cyber-hud-panel {
+				background: var(--cyber-bg);
+				border: 1px solid var(--neon-green);
+				box-shadow: 0 0 20px var(--neon-green-glow);
+				border-radius: 16px;
+				padding: 16px;
+				position: absolute;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 92%;
+				max-width: 440px;
+				backdrop-filter: blur(14px);
+				-webkit-backdrop-filter: blur(14px);
+				font-family: 'Space Grotesk', monospace, sans-serif;
+			}
+			.cyber-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				border-bottom: 1px dashed var(--neon-green);
+				padding-bottom: 8px;
+				margin-bottom: 12px;
+				font-size: 11px;
+				color: var(--neon-green);
+				text-transform: uppercase;
+				letter-spacing: 1px;
+			}
+			.cyber-stats {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 10px;
+				margin-bottom: 12px;
+			}
+			.cyber-stat-box {
+				background: rgba(57, 255, 20, 0.03);
+				border: 1px solid rgba(57, 255, 20, 0.2);
+				border-radius: 8px;
+				padding: 8px;
+				text-align: center;
+			}
+			.cyber-stat-lbl {
+				font-size: 9px;
+				color: rgba(57, 255, 20, 0.6);
+				text-transform: uppercase;
+			}
+			.cyber-stat-val {
+				font-size: 13px;
+				font-weight: 700;
+				color: var(--neon-green);
+				margin-top: 2px;
+			}
+			.crosshair-container {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				width: 140px;
+				height: 140px;
+				border: 1.5px dashed rgba(57, 255, 20, 0.3);
+				border-radius: 50%;
+				pointer-events: none;
+				z-index: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.crosshair-center {
+				width: 6px;
+				height: 6px;
+				background: var(--neon-green);
+				border-radius: 50%;
+				box-shadow: 0 0 8px var(--neon-green);
+			}
+			.cyber-scanline {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 4px;
+				background: rgba(57, 255, 20, 0.15);
+				box-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
+				pointer-events: none;
+				animation: scan 6s linear infinite;
+				z-index: 4;
+			}
+			@keyframes scan {
+				0% { top: 0%; }
+				50% { top: 100%; }
+				100% { top: 0%; }
+			}
+			.btn-cyber {
+				background: rgba(57, 255, 20, 0.08);
+				border: 1px solid var(--neon-green);
+				color: var(--neon-green);
+				padding: 10px;
+				border-radius: 10px;
+				font-weight: 700;
+				font-size: 12px;
+				cursor: pointer;
+				text-transform: uppercase;
+				transition: all 0.2s;
+				width: 100%;
+				text-align: center;
+				letter-spacing: 0.5px;
+			}
+			.btn-cyber:hover {
+				background: rgba(57, 255, 20, 0.2);
+				box-shadow: 0 0 12px var(--neon-green-glow);
+			}
+		</style>
+	</head>
+
+	<body onclick="playCyberSound()">
+		<div class="cyber-scanline"></div>
+
+		<!-- RETÍCULO EN PANTALLA -->
+		<div class="crosshair-container">
+			<div class="crosshair-center"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive" style="background: rgba(6,12,8,0.98);">
+			<div class="loader" style="border-top-color: var(--neon-green);"></div>
+			<p id="loading-text" style="color: var(--neon-green); font-family: 'Space Grotesk', monospace;">[SISTEMA CALIBRANDO HUD ÓPTICO...]</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen" style="background: radial-gradient(circle at center, rgba(6,12,8,0.85) 0%, #000 100%);">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon" style="background: transparent; border: 1.5px solid var(--neon-green); box-shadow: 0 0 20px var(--neon-green-glow);">
+					<i data-lucide="scan" style="color: var(--neon-green); width: 28px; height: 28px;"></i>
+				</div>
+				<h1 style="color: var(--neon-green); font-family: 'Space Grotesk', monospace;">HOLO DIAGNOSTIC HUD</h1>
+				<p style="color: rgba(57,255,20,0.6); font-family: 'Space Grotesk', monospace;">Análisis Espacial Ciberpunk</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center; background: var(--cyber-bg); border-color: var(--neon-green); box-shadow: 0 0 15px var(--neon-green-glow);">
+				<p style="font-size: 13px; color: rgba(57,255,20,0.8); line-height: 1.5; margin-bottom: 14px; font-family: 'Space Grotesk', monospace;">
+					Inicia el escáner de telemetría AR. Se proyectará un robot barredor interactivo y la pantalla monitorizará en tiempo real tus sensores de orientación física y giroscopio.
+				</p>
+				
+				<div style="background: rgba(57, 255, 20, 0.02); border: 1px dashed rgba(57,255,20,0.3); border-radius: 12px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 11px; line-height: 1.5; color: rgba(57,255,20,0.7); font-family: 'Space Grotesk', monospace;">
+					🔊 <b>Efecto Sonoro:</b> Toca la pantalla para emitir pings analógicos.<br>
+					🧭 <b>Sensor en Vivo:</b> Lecturas precisas de cabeceo, balanceo y rumbo.
+				</div>
+
+				<button class="btn-cyber" id="btn-start">
+					[INICIAR ESCÁNER DE ENTORNO]
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'" style="border-color: var(--neon-green); color: var(--neon-green); background: rgba(57,255,20,0.05);">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator" style="border-color: var(--neon-green); color: var(--neon-green); background: rgba(57,255,20,0.05);">
+					<div class="live-dot" style="background-color: var(--neon-green); box-shadow: 0 0 8px var(--neon-green);"></div>
+					<span>HOLO DIAGNOSTIC ACTIVE</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card (Cyberpunk) -->
+			<div class="cyber-hud-panel hud-interactive">
+				<div class="cyber-header">
+					<span>DIAGNOSTIC TELEMETRY</span>
+					<span id="ping-flash" style="color: #fff; display: none;">[PING EMITIDO]</span>
+					<span style="color: var(--neon-green);">ONLINE</span>
+				</div>
+
+				<!-- Telemetría de Sensores en Vivo -->
+				<div class="cyber-stats">
+					<div class="cyber-stat-box">
+						<div class="cyber-stat-lbl">RUMBO (YAW)</div>
+						<div class="cyber-stat-val" id="telemetry-yaw">--°</div>
+					</div>
+					<div class="cyber-stat-box">
+						<div class="cyber-stat-lbl">INCLIN. (PITCH)</div>
+						<div class="cyber-stat-val" id="telemetry-pitch">--°</div>
+					</div>
+					<div class="cyber-stat-box">
+						<div class="cyber-stat-lbl">ROTAC. (ROLL)</div>
+						<div class="cyber-stat-val" id="telemetry-roll">--°</div>
+					</div>
+				</div>
+
+				<div style="font-size: 11px; color: rgba(57, 255, 20, 0.85); line-height: 1.5; margin-bottom: 14px; text-align: left;">
+					>> Escáner SLAM activo en el suelo.<br>
+					>> Haz click en el robot para re-anclar la telemetría.<br>
+					>> Toca la pantalla en cualquier lugar para emitir onda sonora.
+				</div>
+
+				<button class="btn-cyber" onclick="reAnchorRobot()">
+					[RE-CALIBRAR ANCLAJE HOLO]
+				</button>
+			</div>
+		</div>
+
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+			import { LoaderController } from './src/ui/loader.js';
+
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const loaderController = new LoaderController();
+
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = startHolo;
+			});
+
+			function startHolo() {
+				loaderController.show("[INICIALIZANDO ESCÁNER COMPAS Y CÁMARA...]");
+
+				// Activar sensores
+				if (window.DeviceOrientationEvent) {
+					window.addEventListener('deviceorientation', handleOrientation, true);
+				}
+
+				// Coordenadas fijas de Girona
+				const centerLat = 41.296611;
+				const centerLng = 2.760382;
+				gpsService.setTarget(centerLat, centerLng);
+
+				gpsService.startTracking(
+					() => {},
+					(err) => telemetryService.logError(err, 'cyberGPS')
+				);
+
+				// Robot Barredor 3.5 metros al norte
+				const latOffset = 3.5 / 111111;
+				const targetLat = centerLat + latOffset;
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<a-assets>
+							<a-asset-item id="model-robot" src="./assets/Sweeper.glb"></a-asset-item>
+						</a-assets>
+
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#39ff14" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- Holograma del Robot Barredor -->
+						<a-entity
+							id="entity-holo"
+							gltf-model="#model-robot"
+							anchor-manager="lat: ${targetLat}; lng: ${centerLng}; elevation: 0;"
+							gesture-controls="minScale: 0.1; maxScale: 5;"
+							scale="0.6 0.6 0.6"
+							animation-mixer
+							class="holo-target"
+						>
+							<a-text value="HOLO_UNIT_01" position="0 1.2 0" align="center" color="#39ff14" width="4" wrap-count="15" font="monoid"></a-text>
+						</a-entity>
+
+						<a-camera position="0 1.6 0" raycaster="objects: .holo-target" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+					</a-scene>
+				`;
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+
+					const robotEl = document.getElementById('entity-holo');
+					if (robotEl) {
+						robotEl.addEventListener('anchor-placed', () => loaderController.hide(), { once: true });
+					}
+					setTimeout(() => loaderController.hide(), 5000);
+				}, 500);
+			}
+
+			function handleOrientation(e) {
+				let yaw = e.webkitCompassHeading;
+				if (yaw === undefined) yaw = 360 - e.alpha;
+
+				const yawVal = yaw !== undefined && yaw !== null ? Math.round(yaw) : 0;
+				const pitchVal = e.beta !== null ? Math.round(e.beta) : 0;
+				const rollVal = e.gamma !== null ? Math.round(e.gamma) : 0;
+
+				document.getElementById('telemetry-yaw').innerText = `${yawVal}°`;
+				document.getElementById('telemetry-pitch').innerText = `${pitchVal}°`;
+				document.getElementById('telemetry-roll').innerText = `${rollVal}°`;
+			}
+
+			// Efecto de sonido sintetizado analógico (Web Audio API)
+			function playCyberSound() {
+				if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+					try {
+						const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+						const osc = audioCtx.createOscillator();
+						const gain = audioCtx.createGain();
+
+						osc.type = 'sine';
+						// Barrido de frecuencia descendente (clásico ping sonar)
+						osc.frequency.setValueAtTime(900, audioCtx.currentTime);
+						osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.35);
+
+						gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+						gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+
+						osc.connect(gain);
+						gain.connect(audioCtx.destination);
+
+						osc.start();
+						osc.stop(audioCtx.currentTime + 0.35);
+
+						// Mostrar flash visual breve en el HUD
+						const flash = document.getElementById('ping-flash');
+						if (flash) {
+							flash.style.display = 'inline';
+							setTimeout(() => flash.style.display = 'none', 350);
+						}
+					} catch(err) {
+						console.warn("Error de síntesis de audio:", err);
+					}
+				}
+			}
+
+			function reAnchorRobot() {
+				const el = document.getElementById('entity-holo');
+				if (el) {
+					el.emit('trigger-reanchor');
+				}
+			}
+
+			// Exponer global
+			window.playCyberSound = playCyberSound;
+			window.reAnchorRobot = reAnchorRobot;
+		</script>
+	</body>
+</html>

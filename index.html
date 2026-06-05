@@ -32,6 +32,9 @@
 		<!-- Dependencias de 8th Wall y A-Frame -->
 		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
 		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		
+		<!-- A-Frame Extras para reproducir animaciones de modelos GLTF/GLB -->
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
 
 		<!-- Módulos de Lógica ES6 -->
 		<script type="module" src="./src/main.js"></script>
@@ -63,12 +66,139 @@
 			<!-- Botón de instalación PWA -->
 			<button id="pwa-install-btn">📲 Instalar Aplicación Móvil</button>
 
-			<div class="panel">
-				<!-- Paso 1: Selector de Monumento en el Mapa -->
+			<!-- ==================================================== -->
+			<!-- VISTA 1: DASHBOARD PRINCIPAL (MENÚ DE BIENVENIDA) -->
+			<!-- ==================================================== -->
+			<div class="dashboard-grid" id="dashboard-view">
+				<div class="dashboard-card" onclick="switchView('map')">
+					<div class="dashboard-card-icon bg-gradient-blue">
+						<i data-lucide="map" style="color: white; width: 24px; height: 24px;"></i>
+					</div>
+					<div class="dashboard-card-content">
+						<h3>Ruta de Girona</h3>
+						<p>Explora la ciudad en el mapa 2D y desbloquea monumentos históricos en AR.</p>
+					</div>
+					<div class="dashboard-card-arrow">
+						<i data-lucide="chevron-right" style="color: var(--text-muted); width: 20px; height: 20px;"></i>
+					</div>
+				</div>
+
+				<div class="dashboard-card" onclick="startMultiversoAR()">
+					<div class="dashboard-card-icon bg-gradient-purple">
+						<i data-lucide="layers" style="color: white; width: 24px; height: 24px;"></i>
+					</div>
+					<div class="dashboard-card-content">
+						<h3>Multiverso 3D</h3>
+						<p>Visualiza 4 modelos animados simultáneamente espaciados a tu alrededor.</p>
+					</div>
+					<div class="dashboard-card-arrow">
+						<i data-lucide="chevron-right" style="color: var(--text-muted); width: 20px; height: 20px;"></i>
+					</div>
+				</div>
+
+				<div class="dashboard-card" onclick="switchView('character')">
+					<div class="dashboard-card-icon bg-gradient-cyan">
+						<i data-lucide="sparkles" style="color: white; width: 24px; height: 24px;"></i>
+					</div>
+					<div class="dashboard-card-content">
+						<h3>Visor de Personajes</h3>
+						<p>Elige de un catálogo de 10+ modelos animados y proyéctalos en AR.</p>
+					</div>
+					<div class="dashboard-card-arrow">
+						<i data-lucide="chevron-right" style="color: var(--text-muted); width: 20px; height: 20px;"></i>
+					</div>
+				</div>
+
+				<div class="dashboard-card" onclick="switchView('sandbox')">
+					<div class="dashboard-card-icon bg-gradient-green">
+						<i data-lucide="settings-2" style="color: white; width: 24px; height: 24px;"></i>
+					</div>
+					<div class="dashboard-card-content">
+						<h3>Sandbox GPS Manual</h3>
+						<p>Inserta coordenadas GPS de destino personalizadas para pruebas rápidas.</p>
+					</div>
+					<div class="dashboard-card-arrow">
+						<i data-lucide="chevron-right" style="color: var(--text-muted); width: 20px; height: 20px;"></i>
+					</div>
+				</div>
+			</div>
+
+			<!-- ==================================================== -->
+			<!-- SECCIÓN: GALERÍA DE EXPERIENCIAS ESPECIALES -->
+			<!-- ==================================================== -->
+			<div class="section-title" id="gallery-title" style="width: 100%; max-width: 450px; margin-top: 18px; padding: 0 4px;">
+				<i data-lucide="layout-grid" style="width: 16px; height: 16px; color: var(--accent-cyan);"></i>
+				<span>Demos y Estilos Especiales</span>
+			</div>
+			
+			<div class="dashboard-grid" id="special-demos-view" style="margin-top: 10px; margin-bottom: 30px;">
+				<div class="dashboard-card" onclick="location.href='demo_pokemon.html'">
+					<div class="dashboard-card-icon" style="background: linear-gradient(135deg, #ef4444, #f59e0b);">
+						<i data-lucide="swords" style="color: white; width: 22px; height: 22px;"></i>
+					</div>
+					<div class="dashboard-card-content">
+						<h3>Estilo 1: Arena Pokémon</h3>
+						<p>Invoca a Charizard, Scizor, Infernape y Meowth en un simulador de batalla.</p>
+					</div>
+					<div class="dashboard-card-arrow">
+						<i data-lucide="arrow-up-right" style="color: var(--text-muted); width: 18px; height: 18px;"></i>
+					</div>
+				</div>
+
+				<div class="dashboard-card" onclick="location.href='demo_virtual_guide.html'">
+					<div class="dashboard-card-icon" style="background: linear-gradient(135deg, #06b6d4, #3b82f6);">
+						<i data-lucide="user-check" style="color: white; width: 22px; height: 22px;"></i>
+					</div>
+					<div class="dashboard-card-content">
+						<h3>Estilo 2: Guía Turística Parlante</h3>
+						<p>Habla en vivo con Sofía, nuestro avatar 3D con síntesis de voz y subtítulos.</p>
+					</div>
+					<div class="dashboard-card-arrow">
+						<i data-lucide="arrow-up-right" style="color: var(--text-muted); width: 18px; height: 18px;"></i>
+					</div>
+				</div>
+
+				<div class="dashboard-card" onclick="location.href='demo_cyberpunk.html'">
+					<div class="dashboard-card-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+						<i data-lucide="scan" style="color: white; width: 22px; height: 22px;"></i>
+					</div>
+					<div class="dashboard-card-content">
+						<h3>Estilo 3: Holograma Sci-Fi HUD</h3>
+						<p>Estética ciberpunk con sensores de giroscopio en vivo y audio sintetizado.</p>
+					</div>
+					<div class="dashboard-card-arrow">
+						<i data-lucide="arrow-up-right" style="color: var(--text-muted); width: 18px; height: 18px;"></i>
+					</div>
+				</div>
+
+				<div class="dashboard-card" onclick="location.href='demo_flying_creatures.html'">
+					<div class="dashboard-card-icon" style="background: linear-gradient(135deg, #a855f7, #6366f1);">
+						<i data-lucide="cloud-lightning" style="color: white; width: 22px; height: 22px;"></i>
+					</div>
+					<div class="dashboard-card-content">
+						<h3>Estilo 4: Cúpula Aérea</h3>
+						<p>Controla la altitud y física de dragones y murciélagos volando en círculos.</p>
+					</div>
+					<div class="dashboard-card-arrow">
+						<i data-lucide="arrow-up-right" style="color: var(--text-muted); width: 18px; height: 18px;"></i>
+					</div>
+				</div>
+			</div>
+
+			<!-- ==================================================== -->
+			<!-- VISTA 2: RUTA MONUMENTAL (MAPA 2D) -->
+			<!-- ==================================================== -->
+			<div class="panel sub-view" id="map-view" style="display: none;">
+				<div class="sub-view-header">
+					<button class="btn-back-sub" onclick="switchView('dashboard')">
+						<i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i>
+						<span>Menú Principal</span>
+					</button>
+				</div>
 				<div>
 					<div class="section-title">
 						<i data-lucide="map" style="width: 16px; height: 16px;"></i>
-						<span>1. Mapa de Monumentos (Girona)</span>
+						<span>Mapa de Monumentos</span>
 					</div>
 					<p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
 						Toca un marcador en el mapa para abrir la ficha del monumento y activar su visor de Realidad Aumentada.
@@ -76,12 +206,50 @@
 					<!-- Contenedor del Mapa MapLibre -->
 					<div id="map-container"></div>
 				</div>
+			</div>
 
-				<!-- Paso 2: Coordenadas GPS (Fallback de Pruebas / Ajuste Manual) -->
-				<div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;">
+			<!-- ==================================================== -->
+			<!-- VISTA 3: VISOR DE PERSONAJES ANIMADOS -->
+			<!-- ==================================================== -->
+			<div class="panel sub-view" id="character-view" style="display: none;">
+				<div class="sub-view-header">
+					<button class="btn-back-sub" onclick="switchView('dashboard')">
+						<i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i>
+						<span>Menú Principal</span>
+					</button>
+				</div>
+				<div>
+					<div class="section-title" style="margin-bottom: 12px;">
+						<i data-lucide="users" style="width: 16px; height: 16px;"></i>
+						<span>Seleccionar Personaje Animado</span>
+					</div>
+					
+					<!-- Grid de selección de personajes -->
+					<div class="character-grid" id="character-list-container">
+						<!-- Se generará dinámicamente desde el JS -->
+					</div>
+
+					<button class="btn btn-primary" onclick="startCharacterAR()" style="width: 100%; margin-top: 14px;">
+						<i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
+						INICIAR VISOR AR
+					</button>
+				</div>
+			</div>
+
+			<!-- ==================================================== -->
+			<!-- VISTA 4: SANDBOX COORDENADAS MANUALES -->
+			<!-- ==================================================== -->
+			<div class="panel sub-view" id="sandbox-view" style="display: none;">
+				<div class="sub-view-header">
+					<button class="btn-back-sub" onclick="switchView('dashboard')">
+						<i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i>
+						<span>Menú Principal</span>
+					</button>
+				</div>
+				<div>
 					<div class="section-title">
 						<i data-lucide="settings-2" style="width: 16px; height: 16px;"></i>
-						<span>2. Ajuste de Coordenadas Manual</span>
+						<span>Ajuste de Coordenadas Manual</span>
 					</div>
 					<div class="model-grid" style="margin-bottom: 12px;">
 						<div class="model-card active" onclick="selectModel('Chair', 'Silla')" id="card-Chair">

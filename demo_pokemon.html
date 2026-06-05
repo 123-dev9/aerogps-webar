@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Arena de Batalla Pokémon AR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+		<style>
+			/* Sobrescribir estilos específicos de la demo */
+			.pokemon-selector {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				gap: 8px;
+				margin-bottom: 12px;
+			}
+			.pokemon-btn {
+				background: rgba(255, 255, 255, 0.03);
+				border: 1px solid var(--border-color);
+				border-radius: 12px;
+				padding: 10px 4px;
+				text-align: center;
+				cursor: pointer;
+				transition: all 0.2s;
+			}
+			.pokemon-btn.active {
+				background: rgba(239, 68, 68, 0.15);
+				border-color: #ef4444;
+				box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+			}
+			.pokemon-btn-icon {
+				font-size: 20px;
+				margin-bottom: 4px;
+			}
+			.pokemon-btn-name {
+				font-size: 11px;
+				font-weight: 600;
+				color: #fff;
+			}
+			.pokemon-actions {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 10px;
+				margin-top: 10px;
+			}
+			.btn-attack {
+				background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+				border: none;
+				box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+			}
+			.btn-taunt {
+				background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+				border: none;
+				box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+			}
+		</style>
+	</head>
+
+	<body>
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1" style="background: #ef4444;"></div>
+			<div class="glow-orb orb-2" style="background: #f59e0b;"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader" style="border-top-color: #ef4444;"></div>
+			<p id="loading-text">Invocando a los Pokémon en el área...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon" style="background: linear-gradient(135deg, #ef4444, #f59e0b); box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);">
+					<i data-lucide="swords" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>Batalla Pokémon AR</h1>
+				<p>Arena de Combate Inmersiva</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+					Esta demostración invocará a **4 Pokémon animados** en círculo a tu alrededor a 4 metros de distancia. Podrás seleccionarlos y activar sus ataques en tiempo real.
+				</p>
+
+				<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 12px; line-height: 1.4; color: var(--text-muted);">
+					🔥 <b>Norte:</b> Charizard (Dragón Fuego)<br>
+					⚙️ <b>Sur:</b> Scizor (Acero y Tenazas)<br>
+					🐒 <b>Este:</b> Infernape (Fuego y Lucha)<br>
+					🐱 <b>Oeste:</b> Meowth (Monedas y Agilidad)
+				</div>
+
+				<button class="btn btn-primary btn-attack" id="btn-start" style="width: 100%;">
+					<i data-lucide="play" style="width: 18px; height: 18px;"></i>
+					INICIAR COMBATE AR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot" style="background-color: #ef4444;"></div>
+					<span>ARENA DE COMBATE ACTIVA</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card -->
+			<div class="hud-bottom hud-interactive">
+				<div class="section-title" style="color: #ef4444;">
+					<i data-lucide="zap" style="width: 15px; height: 15px;"></i>
+					<span>Entrenador: Elige tu Pokémon</span>
+				</div>
+				
+				<!-- Selector de Pokémon -->
+				<div class="pokemon-selector">
+					<div class="pokemon-btn active" onclick="selectPokemon('charizard')" id="btn-charizard">
+						<div class="pokemon-btn-icon">🔥</div>
+						<div class="pokemon-btn-name">Charizard</div>
+					</div>
+					<div class="pokemon-btn" onclick="selectPokemon('scizor')" id="btn-scizor">
+						<div class="pokemon-btn-icon">✂️</div>
+						<div class="pokemon-btn-name">Scizor</div>
+					</div>
+					<div class="pokemon-btn" onclick="selectPokemon('infernape')" id="btn-infernape">
+						<div class="pokemon-btn-icon">🐒</div>
+						<div class="pokemon-btn-name">Infernape</div>
+					</div>
+					<div class="pokemon-btn" onclick="selectPokemon('meowth')" id="btn-meowth">
+						<div class="pokemon-btn-icon">🐱</div>
+						<div class="pokemon-btn-name">Meowth</div>
+					</div>
+				</div>
+
+				<div class="hud-info-grid" style="border: none; padding-bottom: 0;">
+					<div class="hud-stat">
+						<span class="hud-stat-label">Pokémon Activo</span>
+						<span class="hud-stat-val" id="active-pokemon-name" style="color: #ef4444;">Charizard</span>
+					</div>
+					<div class="hud-stat" style="text-align: right;">
+						<span class="hud-stat-label">Animaciones Detectadas</span>
+						<span class="hud-stat-val" id="active-pokemon-clips">Cargando...</span>
+					</div>
+				</div>
+
+				<!-- Botones de Acción -->
+				<div class="pokemon-actions">
+					<button class="btn btn-primary btn-attack" onclick="triggerAction(0)">
+						<i data-lucide="swords" style="width: 16px; height: 16px;"></i>
+						Ataque 1
+					</button>
+					<button class="btn btn-primary btn-taunt" onclick="triggerAction(1)">
+						<i data-lucide="flame" style="width: 16px; height: 16px;"></i>
+						Ataque 2
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Componentes y Lógica -->
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+			import { LoaderController } from './src/ui/loader.js';
+
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const loaderController = new LoaderController();
+
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			let activePokemon = 'charizard';
+			const pokemonMetadata = {
+				charizard: { name: 'Charizard Volador', entityId: 'entity-charizard' },
+				scizor: { name: 'Scizor Metálico', entityId: 'entity-scizor' },
+				infernape: { name: 'Infernape Fuego', entityId: 'entity-infernape' },
+				meowth: { name: 'Meowth Felino', entityId: 'entity-meowth' }
+			};
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = startBattle;
+			});
+
+			function startBattle() {
+				loaderController.show("Calibrando arena de batalla Pokémon...");
+				
+				// Centro de prueba
+				const centerLat = 41.296611;
+				const centerLng = 2.760382;
+				gpsService.setTarget(centerLat, centerLng);
+
+				gpsService.startTracking(
+					() => {},
+					(err) => telemetryService.logError(err, 'pokemonGPS')
+				);
+
+				// Distribuir a 4 metros en direcciones cardinales
+				const latOffset = 4 / 111111;
+				const lngOffset = 4 / (111111 * Math.cos(centerLat * Math.PI / 180));
+
+				const northLat = centerLat + latOffset, northLng = centerLng;
+				const southLat = centerLat - latOffset, southLng = centerLng;
+				const eastLat = centerLat, eastLng = centerLng + lngOffset;
+				const westLat = centerLat, westLng = centerLng - lngOffset;
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<a-assets>
+							<a-asset-item id="model-charizard" src="./assets/charizard_flying_animation.glb"></a-asset-item>
+							<a-asset-item id="model-scizor" src="./assets/pokemon_3ds_scizor.glb"></a-asset-item>
+							<a-asset-item id="model-infernape" src="./assets/pokemon_pokedex_3d_pro_infernape.glb"></a-asset-item>
+							<a-asset-item id="model-meowth" src="./assets/pokemon_3ds_meowth.glb"></a-asset-item>
+						</a-assets>
+
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#ef4444" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- Charizard (Norte) -->
+						<a-entity
+							id="entity-charizard"
+							gltf-model="#model-charizard"
+							anchor-manager="lat: ${northLat}; lng: ${northLng}; elevation: 1.0;"
+							gesture-controls="minScale: 0.05; maxScale: 5;"
+							scale="0.5 0.5 0.5"
+							animation-mixer="clip: *; loop: repeat"
+							class="pokemon-target"
+						>
+							<a-text value="Charizard Lv.50" position="0 2.2 0" align="center" color="#ef4444" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<!-- Scizor (Sur) -->
+						<a-entity
+							id="entity-scizor"
+							gltf-model="#model-scizor"
+							anchor-manager="lat: ${southLat}; lng: ${southLng}; elevation: 0;"
+							gesture-controls="minScale: 0.05; maxScale: 5;"
+							scale="0.4 0.4 0.4"
+							animation-mixer="clip: *; loop: repeat"
+							class="pokemon-target"
+						>
+							<a-text value="Scizor Lv.45" position="0 1.8 0" align="center" color="#dc2626" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<!-- Infernape (Este) -->
+						<a-entity
+							id="entity-infernape"
+							gltf-model="#model-infernape"
+							anchor-manager="lat: ${eastLat}; lng: ${eastLng}; elevation: 0;"
+							gesture-controls="minScale: 0.05; maxScale: 5;"
+							scale="0.4 0.4 0.4"
+							animation-mixer="clip: *; loop: repeat"
+							class="pokemon-target"
+						>
+							<a-text value="Infernape Lv.48" position="0 2.0 0" align="center" color="#ea580c" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<!-- Meowth (Oeste) -->
+						<a-entity
+							id="entity-meowth"
+							gltf-model="#model-meowth"
+							anchor-manager="lat: ${westLat}; lng: ${westLng}; elevation: 0;"
+							gesture-controls="minScale: 0.05; maxScale: 5;"
+							scale="0.4 0.4 0.4"
+							animation-mixer="clip: *; loop: repeat"
+							class="pokemon-target"
+						>
+							<a-text value="Meowth Lv.15" position="0 1.2 0" align="center" color="#eab308" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<a-camera position="0 1.6 0" raycaster="objects: .pokemon-target" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+					</a-scene>
+				`;
+
+				// Configurar detectores de animaciones
+				setupAnimationDetectors();
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+					
+					// Ocultar cargador cuando se fije el primero
+					const first = document.getElementById('entity-charizard');
+					if (first) {
+						first.addEventListener('anchor-placed', () => loaderController.hide(), { once: true });
+					}
+					setTimeout(() => loaderController.hide(), 5000);
+				}, 500);
+			}
+
+			function setupAnimationDetectors() {
+				Object.keys(pokemonMetadata).forEach(key => {
+					const meta = pokemonMetadata[key];
+					setTimeout(() => {
+						const el = document.getElementById(meta.entityId);
+						if (el) {
+							el.addEventListener('model-loaded', () => {
+								const model = el.getObject3D('mesh');
+								if (model && model.animations && model.animations.length > 0) {
+									const clips = model.animations.map(a => a.name);
+									el.dataset.clips = JSON.stringify(clips);
+									console.log(`[Pokemon] Clips de ${key}:`, clips);
+									if (key === activePokemon) {
+										updateClipsIndicator(clips);
+									}
+								}
+							});
+						}
+					}, 1000);
+				});
+			}
+
+			function updateClipsIndicator(clips) {
+				const valEl = document.getElementById('active-pokemon-clips');
+				if (valEl) {
+					valEl.innerText = clips.length > 0 ? `${clips.length} acciones` : 'Ninguna';
+				}
+			}
+
+			function selectPokemon(key) {
+				activePokemon = key;
+				document.querySelectorAll('.pokemon-btn').forEach(b => b.classList.remove('active'));
+				document.getElementById(`btn-${key}`).classList.add('active');
+
+				const meta = pokemonMetadata[key];
+				document.getElementById('active-pokemon-name').innerText = meta.name;
+
+				const el = document.getElementById(meta.entityId);
+				const clips = JSON.parse(el?.dataset.clips || "[]");
+				updateClipsIndicator(clips);
+			}
+
+			function triggerAction(actionIndex) {
+				const meta = pokemonMetadata[activePokemon];
+				const el = document.getElementById(meta.entityId);
+				if (!el) return;
+
+				const clips = JSON.parse(el.dataset.clips || "[]");
+				if (clips.length === 0) {
+					alert("El modelo no tiene animaciones configuradas.");
+					return;
+				}
+
+				// Seleccionar el clip por índice
+				const clipName = clips[actionIndex % clips.length];
+				console.log(`[Pokemon] Reproduciendo clip: ${clipName} en ${activePokemon}`);
+
+				// Cambiar el clip y reproducir una sola vez
+				el.setAttribute('animation-mixer', {
+					clip: clipName,
+					loop: 'once',
+					clampWhenFinished: true,
+					crossFadeDuration: 0.3
+				});
+
+				// Volver a reproducir por defecto después del ataque
+				const onFinished = () => {
+					el.setAttribute('animation-mixer', {
+						clip: '*',
+						loop: 'repeat',
+						crossFadeDuration: 0.5
+					});
+					el.removeEventListener('animation-finished', onFinished);
+				};
+				el.addEventListener('animation-finished', onFinished);
+			}
+
+			// Exponer al objeto window para inline onclick
+			window.selectPokemon = selectPokemon;
+			window.triggerAction = triggerAction;
+		</script>
+	</body>
+</html>

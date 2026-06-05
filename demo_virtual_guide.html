@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Guía Virtual Parlante AR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+		<style>
+			/* Panel de Subtítulos y Diálogo del Guía */
+			.guide-dialog-panel {
+				background: rgba(10, 14, 26, 0.85);
+				border: 1px solid var(--accent-cyan);
+				box-shadow: 0 0 15px var(--accent-cyan-glow);
+				border-radius: 20px;
+				padding: 18px;
+				position: absolute;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 90%;
+				max-width: 420px;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+			}
+			.guide-header {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+				padding-bottom: 8px;
+			}
+			.guide-avatar {
+				width: 32px;
+				height: 32px;
+				background: rgba(6, 182, 212, 0.1);
+				border: 1px solid var(--accent-cyan);
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 16px;
+			}
+			.guide-name {
+				font-family: 'Space Grotesk', sans-serif;
+				font-size: 14px;
+				font-weight: 700;
+				color: #fff;
+			}
+			.guide-role {
+				font-size: 10px;
+				color: var(--accent-cyan);
+				text-transform: uppercase;
+				font-weight: 600;
+			}
+			.guide-bubble-text {
+				font-size: 13px;
+				line-height: 1.5;
+				color: var(--text-main);
+				min-height: 48px;
+			}
+			.guide-controls {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-top: 4px;
+			}
+			.btn-talk {
+				background: linear-gradient(135deg, var(--accent-cyan) 0%, #0891b2 100%);
+				border: none;
+				padding: 8px 16px;
+				border-radius: 10px;
+				color: #0a0e1a;
+				font-size: 12px;
+				font-weight: 700;
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				box-shadow: 0 4px 10px var(--accent-cyan-glow);
+			}
+			.btn-talk:hover {
+				filter: brightness(1.1);
+			}
+			.voice-wave {
+				display: flex;
+				align-items: center;
+				gap: 3px;
+				height: 15px;
+			}
+			.wave-bar {
+				width: 2px;
+				height: 100%;
+				background-color: var(--accent-cyan);
+				border-radius: 1px;
+				animation: wave-pulse 1.2s ease-in-out infinite alternate;
+			}
+			.wave-bar:nth-child(2) { animation-delay: 0.15s; height: 60%; }
+			.wave-bar:nth-child(3) { animation-delay: 0.3s; height: 85%; }
+			.wave-bar:nth-child(4) { animation-delay: 0.45s; height: 40%; }
+			
+			@keyframes wave-pulse {
+				from { transform: scaleY(0.3); }
+				to { transform: scaleY(1.2); }
+			}
+		</style>
+	</head>
+
+	<body>
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1" style="background: var(--accent-cyan);"></div>
+			<div class="glow-orb orb-2" style="background: var(--primary);"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader" style="border-top-color: var(--accent-cyan);"></div>
+			<p id="loading-text">Conectando con la Guía Sofía en AR...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon" style="background: linear-gradient(135deg, var(--accent-cyan), var(--primary));">
+					<i data-lucide="user-check" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>Guía Virtual Interactiva</h1>
+				<p>AR Turística Asistida por Voz</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+					Esta demo proyectará una **Guía Turística 3D** delante de ti. Al interactuar con ella, te relatará historias sobre la Catedral de Girona utilizando **síntesis de voz real** y subtítulos sincronizados.
+				</p>
+				
+				<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 11px; line-height: 1.4; color: var(--text-muted);">
+					🗣️ <b>Voz Sintetizada:</b> Utiliza el motor TTS nativo de tu móvil.<br>
+					💬 <b>Interactividad:</b> Pulsa "Siguiente" o toca el avatar en AR para cambiar de tema.
+				</div>
+
+				<button class="btn btn-primary" id="btn-start" style="width: 100%;">
+					<i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+					INICIAR GUÍA EN AR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot" style="background-color: var(--accent-cyan);"></div>
+					<span>GUÍA DE GIRONA EN AR</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card (Diálogo) -->
+			<div class="guide-dialog-panel hud-interactive">
+				<div class="guide-header">
+					<div class="guide-avatar">👩</div>
+					<div>
+						<div class="guide-name">Sofía</div>
+						<div class="guide-role">Guía Oficial 3D</div>
+					</div>
+					<div class="voice-wave" id="wave-container" style="margin-left: auto; display: none;">
+						<div class="wave-bar"></div>
+						<div class="wave-bar"></div>
+						<div class="wave-bar"></div>
+						<div class="wave-bar"></div>
+					</div>
+				</div>
+
+				<div class="guide-bubble-text" id="guide-subtitle">
+					Hola, soy Sofía. Pulsa el botón inferior para que empiece a hablarte sobre el casco antiguo de Girona.
+				</div>
+
+				<div class="guide-controls">
+					<span style="font-size: 10px; color: var(--text-muted);" id="guide-step-text">Diálogo 1 / 3</span>
+					<button class="btn-talk" onclick="nextDialogue()" id="btn-next">
+						<i data-lucide="volume-2" style="width: 15px; height: 15px;"></i>
+						<span id="btn-talk-text">Escuchar</span>
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+			import { LoaderController } from './src/ui/loader.js';
+
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const loaderController = new LoaderController();
+
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			const dialogues = [
+				{
+					text: "¡Hola! Bienvenido a Girona. Soy Sofía, tu guía turística digital. Delante de ti tienes la Catedral de Santa María, famosa por poseer la nave gótica más ancha de todo el mundo y una imponente escalinata barroca.",
+					anim: "Talking" // Si el modelo tuviera animaciones específicas
+				},
+				{
+					text: "La gran escalinata que sube hasta la Catedral cuenta con noventa escalones. Este hermoso lugar fue escenario de rodaje de series tan famosas como Juego de Tronos, recreando el Gran Septo de Baelor.",
+					anim: "Pointing"
+				},
+				{
+					text: "A pocos metros de aquí cruzando el río Onyar, encontrarás el Pont de Pedra y las casas de colores colgantes. Es una ruta imprescindible que te recomiendo visitar a pie. ¡Espero que disfrutes Girona!",
+					anim: "Talking"
+				}
+			];
+			let currentStep = -1;
+			let speaking = false;
+			let currentUtterance = null;
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = startGuide;
+			});
+
+			function startGuide() {
+				loaderController.show("Invocando a tu guía en el espacio...");
+				
+				// Colocar a 2.5 metros al norte del usuario
+				const centerLat = 41.296611;
+				const centerLng = 2.760382;
+				gpsService.setTarget(centerLat, centerLng);
+
+				gpsService.startTracking(
+					() => {},
+					(err) => telemetryService.logError(err, 'guideGPS')
+				);
+
+				const latOffset = 2.5 / 111111;
+				const targetLat = centerLat + latOffset;
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<a-assets>
+							<a-asset-item id="model-guide" src="./assets/girl_look_around.glb"></a-asset-item>
+						</a-assets>
+
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#06b6d4" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- La Guía Sofía -->
+						<a-entity
+							id="entity-guide"
+							gltf-model="#model-guide"
+							anchor-manager="lat: ${targetLat}; lng: ${centerLng}; elevation: 0;"
+							gesture-controls="minScale: 0.1; maxScale: 5;"
+							scale="0.8 0.8 0.8"
+							animation-mixer="clip: *; loop: repeat"
+							class="guide-target"
+							onclick="nextDialogue()"
+						>
+							<a-text value="Sofia - Guia AR" position="0 2.0 0" align="center" color="#06b6d4" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<a-camera position="0 1.6 0" raycaster="objects: .guide-target" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+					</a-scene>
+				`;
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+
+					const guideEl = document.getElementById('entity-guide');
+					if (guideEl) {
+						guideEl.addEventListener('anchor-placed', () => loaderController.hide(), { once: true });
+					}
+					setTimeout(() => loaderController.hide(), 5000);
+				}, 500);
+			}
+
+			function nextDialogue() {
+				if ('speechSynthesis' in window) {
+					if (speaking) {
+						window.speechSynthesis.cancel();
+						speaking = false;
+						document.getElementById('wave-container').style.display = 'none';
+						document.getElementById('btn-talk-text').innerText = "Escuchar";
+						return;
+					}
+
+					currentStep = (currentStep + 1) % dialogues.length;
+					const data = dialogues[currentStep];
+
+					// Actualizar interfaz
+					document.getElementById('guide-subtitle').innerText = data.text;
+					document.getElementById('guide-step-text').innerText = `Diálogo ${currentStep + 1} / ${dialogues.length}`;
+					document.getElementById('btn-talk-text').innerText = "Detener";
+					document.getElementById('wave-container').style.display = 'flex';
+
+					// Configurar audio
+					currentUtterance = new SpeechSynthesisUtterance(data.text);
+					currentUtterance.lang = 'es-ES';
+					currentUtterance.rate = 1.0; // Velocidad normal
+
+					currentUtterance.onend = () => {
+						speaking = false;
+						document.getElementById('wave-container').style.display = 'none';
+						document.getElementById('btn-talk-text').innerText = "Siguiente";
+					};
+
+					currentUtterance.onerror = () => {
+						speaking = false;
+						document.getElementById('wave-container').style.display = 'none';
+						document.getElementById('btn-talk-text').innerText = "Escuchar";
+					};
+
+					speaking = true;
+					window.speechSynthesis.speak(currentUtterance);
+				} else {
+					// Fallback si no tiene TTS
+					currentStep = (currentStep + 1) % dialogues.length;
+					document.getElementById('guide-subtitle').innerText = dialogues[currentStep].text;
+					document.getElementById('guide-step-text').innerText = `Diálogo ${currentStep + 1} / ${dialogues.length}`;
+					document.getElementById('btn-talk-text').innerText = "Siguiente";
+				}
+			}
+
+			// Exponer a global window
+			window.nextDialogue = nextDialogue;
+		</script>
+	</body>
+</html>
