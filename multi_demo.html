@@ -64,29 +64,29 @@
 						<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
 							<span style="font-size: 18px;">🐉</span>
 							<div>
-								<div style="font-size: 12px; font-weight: 600; color: #fff;">Dragón (Centro)</div>
-								<div style="font-size: 10px; color: var(--text-muted);">Ubicación central: 41.296611, 2.760382</div>
+								<div style="font-size: 12px; font-weight: 600; color: #fff;">Dragón (4m al Norte)</div>
+								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296647, 2.760382</div>
 							</div>
 						</div>
 						<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
 							<span style="font-size: 18px;">🎡</span>
 							<div>
-								<div style="font-size: 12px; font-weight: 600; color: #fff;">Noria (5m al Norte)</div>
-								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296656, 2.760382</div>
+								<div style="font-size: 12px; font-weight: 600; color: #fff;">Noria (4m al Sur)</div>
+								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296575, 2.760382</div>
 							</div>
 						</div>
 						<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
 							<span style="font-size: 18px;">🦇</span>
 							<div>
-								<div style="font-size: 12px; font-weight: 600; color: #fff;">Murciélago (5m al Este)</div>
-								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296611, 2.760442</div>
+								<div style="font-size: 12px; font-weight: 600; color: #fff;">Murciélago (4m al Este)</div>
+								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296611, 2.760430</div>
 							</div>
 						</div>
 						<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
 							<span style="font-size: 18px;">🤖</span>
 							<div>
-								<div style="font-size: 12px; font-weight: 600; color: #fff;">Robot (5m al Oeste)</div>
-								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296611, 2.760322</div>
+								<div style="font-size: 12px; font-weight: 600; color: #fff;">Robot (4m al Oeste)</div>
+								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296611, 2.760334</div>
 							</div>
 						</div>
 					</div>
@@ -225,52 +225,52 @@
 							<a-ring color="#06b6d4" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
 						</a-entity>
 
-						<!-- OBJETO 1: Dragón (Coordenada Central) -->
+						<!-- OBJETO 1: Dragón (4m al Norte) -->
 						<a-entity
 							id="entity-dragon"
 							gltf-model="#model-dragon"
-							anchor-manager="lat: 41.296611; lng: 2.760382; elevation: 0.5;"
-							gesture-controls="minScale: 1; maxScale: 80;"
-							scale="10 10 10"
+							anchor-manager="lat: 41.296647; lng: 2.760382; elevation: 0.5;"
+							gesture-controls="minScale: 0.05; maxScale: 15; sensitivity: 0.005;"
+							scale="0.6 0.6 0.6"
 							animation-mixer
 						>
 							<a-text value="Dragon Volador" position="0 2.2 0" align="center" color="#06b6d4" width="4" wrap-count="15"></a-text>
 						</a-entity>
 
-						<!-- OBJETO 2: Noria (5m al Norte de la Central) -->
+						<!-- OBJETO 2: Noria (4m al Sur) -->
 						<a-entity
 							id="entity-ferris"
 							gltf-model="#model-ferris"
-							anchor-manager="lat: 41.296656; lng: 2.760382; elevation: 0;"
-							gesture-controls="minScale: 0.5; maxScale: 40;"
-							scale="3 3 3"
+							anchor-manager="lat: 41.296575; lng: 2.760382; elevation: 0;"
+							gesture-controls="minScale: 0.01; maxScale: 5; sensitivity: 0.002;"
+							scale="0.15 0.15 0.15"
 							animation-mixer
 						>
-							<a-text value="Noria Gigante (+5m Norte)" position="0 3.2 0" align="center" color="#10b981" width="4" wrap-count="15"></a-text>
+							<a-text value="Noria Gigante" position="0 3.2 0" align="center" color="#10b981" width="4" wrap-count="15"></a-text>
 						</a-entity>
 
-						<!-- OBJETO 3: Murciélago (5m al Este de la Central) -->
+						<!-- OBJETO 3: Murciélago (4m al Este) -->
 						<a-entity
 							id="entity-bat"
 							gltf-model="#model-bat"
-							anchor-manager="lat: 41.296611; lng: 2.760442; elevation: 1.5;"
-							gesture-controls="minScale: 2; maxScale: 100;"
-							scale="12 12 12"
+							anchor-manager="lat: 41.296611; lng: 2.760430; elevation: 1.5;"
+							gesture-controls="minScale: 0.05; maxScale: 15; sensitivity: 0.005;"
+							scale="0.6 0.6 0.6"
 							animation-mixer
 						>
-							<a-text value="Murcielago (+5m Este)" position="0 1.2 0" align="center" color="#f43f5e" width="4" wrap-count="15"></a-text>
+							<a-text value="Murcielago" position="0 1.2 0" align="center" color="#f43f5e" width="4" wrap-count="15"></a-text>
 						</a-entity>
 
-						<!-- OBJETO 4: Robot Barredor (5m al Oeste de la Central) -->
+						<!-- OBJETO 4: Robot Barredor (4m al Oeste) -->
 						<a-entity
 							id="entity-sweeper"
 							gltf-model="#model-sweeper"
-							anchor-manager="lat: 41.296611; lng: 2.760322; elevation: 0;"
-							gesture-controls="minScale: 2; maxScale: 80;"
-							scale="12 12 12"
+							anchor-manager="lat: 41.296611; lng: 2.760334; elevation: 0;"
+							gesture-controls="minScale: 0.05; maxScale: 15; sensitivity: 0.005;"
+							scale="0.6 0.6 0.6"
 							animation-mixer
 						>
-							<a-text value="Robot Barredor (+5m Oeste)" position="0 1.5 0" align="center" color="#a855f7" width="4" wrap-count="15"></a-text>
+							<a-text value="Robot Barredor" position="0 1.5 0" align="center" color="#a855f7" width="4" wrap-count="15"></a-text>
 						</a-entity>
 
 						<a-camera position="0 1.6 0" raycaster="objects: #entity-dragon, #entity-ferris, #entity-bat, #entity-sweeper" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
