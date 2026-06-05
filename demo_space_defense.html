@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Defensor Espacial AR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+		<style>
+			/* Paleta Neon de Combate */
+			:root {
+				--accent-neon-pink: #ff2a74;
+				--accent-neon-blue: #00f3ff;
+				--accent-neon-purple: #b92aff;
+			}
+
+			/* Retícula de Apuntado Cyberpunk */
+			.game-crosshair {
+				position: fixed;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				width: 50px;
+				height: 50px;
+				border: 1.5px solid rgba(0, 243, 255, 0.4);
+				border-radius: 50%;
+				pointer-events: none;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				transition: all 0.1s ease;
+			}
+			.game-crosshair::before {
+				content: '';
+				width: 6px;
+				height: 6px;
+				background-color: var(--accent-neon-pink);
+				border-radius: 50%;
+				box-shadow: 0 0 8px var(--accent-neon-pink);
+			}
+			.game-crosshair::after {
+				content: '';
+				position: absolute;
+				width: 60%;
+				height: 60%;
+				border-top: 2px solid var(--accent-neon-blue);
+				border-bottom: 2px solid var(--accent-neon-blue);
+				border-radius: 50%;
+				animation: spin-radar 4s linear infinite;
+			}
+			@keyframes spin-radar {
+				0% { transform: rotate(0deg); }
+				100% { transform: rotate(360deg); }
+			}
+
+			/* HUD Principal del Juego */
+			.space-hud-panel {
+				background: rgba(8, 10, 20, 0.88);
+				border: 1.5px solid var(--accent-neon-blue);
+				box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+				border-radius: 24px;
+				padding: 16px 20px;
+				position: absolute;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 92%;
+				max-width: 440px;
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+				z-index: 5;
+			}
+
+			.hud-stats-row {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				gap: 15px;
+			}
+
+			.stat-box {
+				flex: 1;
+				text-align: center;
+			}
+			.stat-label {
+				font-size: 9px;
+				text-transform: uppercase;
+				color: var(--text-muted);
+				font-weight: 700;
+				letter-spacing: 1.5px;
+				margin-bottom: 4px;
+			}
+			.stat-value {
+				font-family: 'Space Grotesk', sans-serif;
+				font-size: 22px;
+				font-weight: 800;
+				color: var(--accent-neon-blue);
+				text-shadow: 0 0 8px rgba(0, 243, 255, 0.4);
+			}
+			.stat-value.pink {
+				color: var(--accent-neon-pink);
+				text-shadow: 0 0 8px rgba(255, 42, 116, 0.4);
+			}
+
+			/* Barra de Tiempo */
+			.timer-container {
+				width: 100%;
+				height: 6px;
+				background: rgba(255, 255, 255, 0.05);
+				border-radius: 3px;
+				overflow: hidden;
+				position: relative;
+			}
+			.timer-bar {
+				height: 100%;
+				width: 100%;
+				background: linear-gradient(90deg, var(--accent-neon-blue), var(--accent-neon-pink));
+				box-shadow: 0 0 8px var(--accent-neon-pink);
+				transition: width 0.1s linear;
+			}
+
+			/* Mini Radar de Combate */
+			.radar-widget {
+				position: absolute;
+				top: 80px;
+				right: 20px;
+				width: 80px;
+				height: 80px;
+				background: rgba(8, 10, 20, 0.85);
+				border: 1.5px solid var(--accent-neon-blue);
+				border-radius: 50%;
+				box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+				backdrop-filter: blur(8px);
+				z-index: 5;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.radar-grid {
+				position: absolute;
+				width: 85%;
+				height: 85%;
+				border: 1px dashed rgba(0, 243, 255, 0.25);
+				border-radius: 50%;
+			}
+			.radar-crosshair-h {
+				position: absolute;
+				width: 100%;
+				height: 1px;
+				background: rgba(0, 243, 255, 0.15);
+			}
+			.radar-crosshair-v {
+				position: absolute;
+				width: 1px;
+				height: 100%;
+				background: rgba(0, 243, 255, 0.15);
+			}
+			.radar-sweep {
+				position: absolute;
+				width: 100%;
+				height: 100%;
+				border-radius: 50%;
+				background: conic-gradient(from 0deg, rgba(0, 243, 255, 0.15) 0deg, transparent 90deg, transparent 360deg);
+				animation: spin-radar 3s linear infinite;
+			}
+			.radar-dot {
+				position: absolute;
+				width: 6px;
+				height: 6px;
+				background: var(--accent-neon-pink);
+				border-radius: 50%;
+				box-shadow: 0 0 8px var(--accent-neon-pink);
+				transform: translate(-50%, -50%);
+				transition: all 0.2s ease;
+			}
+
+			/* Pantalla Game Over */
+			.gameover-screen {
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background: rgba(5, 7, 15, 0.95);
+				z-index: 100;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				padding: 24px;
+				backdrop-filter: blur(15px);
+				display: none; /* Se activa con JS */
+			}
+			.gameover-panel {
+				background: rgba(15, 20, 35, 0.8);
+				border: 2px solid var(--accent-neon-pink);
+				box-shadow: 0 0 30px rgba(255, 42, 116, 0.3);
+				border-radius: 32px;
+				padding: 30px;
+				width: 100%;
+				max-width: 440px;
+				text-align: center;
+				display: flex;
+				flex-direction: column;
+				gap: 20px;
+			}
+			.gameover-title {
+				font-family: 'Space Grotesk', sans-serif;
+				font-size: 36px;
+				font-weight: 800;
+				color: var(--accent-neon-pink);
+				text-shadow: 0 0 12px rgba(255, 42, 116, 0.5);
+				margin: 0;
+				letter-spacing: 2px;
+			}
+			.gameover-stats-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 16px;
+				background: rgba(0,0,0,0.2);
+				border-radius: 16px;
+				padding: 16px;
+				border: 1px solid rgba(255,255,255,0.03);
+			}
+		</style>
+	</head>
+ 
+	<body>
+		<!-- Retículo central de apuntado -->
+		<div class="game-crosshair" id="crosshair-el"></div>
+
+		<!-- Mini Radar en Pantalla -->
+		<div class="radar-widget" id="radar-widget-el" style="display: none;">
+			<div class="radar-grid"></div>
+			<div class="radar-crosshair-h"></div>
+			<div class="radar-crosshair-v"></div>
+			<div class="radar-sweep"></div>
+			<!-- Puntos de enemigos se inyectarán aquí -->
+			<div id="radar-dots-container"></div>
+		</div>
+
+		<!-- Glows de Fondo -->
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1" style="background: var(--accent-neon-pink); opacity: 0.08;"></div>
+			<div class="glow-orb orb-2" style="background: var(--accent-neon-blue); opacity: 0.12;"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader" style="border-top-color: var(--accent-neon-blue);"></div>
+			<p id="loading-text">Cargando el campo de defensa espacial...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon" style="background: linear-gradient(135deg, var(--accent-neon-pink), var(--accent-neon-purple)); box-shadow: 0 0 25px rgba(255, 42, 116, 0.4);">
+					<i data-lucide="rocket" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>Defensor Espacial AR</h1>
+				<p>Juego de Combate en 360 Grados</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+					¡Prepara tus defensas! 3 criaturas espaciales orbitan a tu alrededor. Usa la retícula para apuntar y **toca la pantalla** para disparar ráfagas láser. Tienes **60 segundos** para acumular el máximo de puntos.
+				</p>
+				
+				<div style="background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(0, 243, 255, 0.25); border-radius: 12px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 11px; line-height: 1.4; color: var(--text-muted);">
+					⚡ <b>Láseres de Neon:</b> Proyectiles rectilíneos de alta velocidad.<br>
+					🎯 <b>Radar Activo:</b> Localiza enemigos ocultos en tu retaguardia.<br>
+					👾 <b>Puntuaciones:</b> Murciélagos: 10 pts. Robots Dron: 25 pts.
+				</div>
+
+				<button class="btn btn-primary" id="btn-start" style="width: 100%; background: linear-gradient(135deg, var(--accent-neon-blue) 0%, var(--accent-neon-purple) 100%); border: none;">
+					<i data-lucide="sword" style="width: 18px; height: 18px;"></i>
+					INICIAR BATALLA AR
+				</button>
+			</div>
+		</div>
+
+		<!-- PANTALLA GAME OVER -->
+		<div class="gameover-screen" id="game-over-screen-el">
+			<div class="gameover-panel">
+				<div class="logo-icon" style="background: var(--accent-neon-pink); margin: 0 auto; box-shadow: 0 0 25px rgba(255, 42, 116, 0.5);">
+					<i data-lucide="trophy" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h2 class="gameover-title">FIN DE LA BATALLA</h2>
+				<p style="font-size: 13px; color: var(--text-muted); margin: 0;">Has defendido la órbita de Girona con honor.</p>
+
+				<div class="gameover-stats-grid">
+					<div>
+						<div class="score-lbl" style="font-size: 9px;">Puntaje Final</div>
+						<div class="stat-value" id="go-score" style="font-size: 26px;">0</div>
+					</div>
+					<div>
+						<div class="score-lbl" style="font-size: 9px;">Precisión</div>
+						<div class="stat-value pink" id="go-accuracy" style="font-size: 26px;">0%</div>
+					</div>
+					<div style="margin-top: 8px;">
+						<div class="score-lbl" style="font-size: 8px;">Eliminados</div>
+						<div class="stat-value" id="go-hits" style="font-size: 18px; color: var(--text-main);">0</div>
+					</div>
+					<div style="margin-top: 8px;">
+						<div class="score-lbl" style="font-size: 8px;">Disparos</div>
+						<div class="stat-value" id="go-shots" style="font-size: 18px; color: var(--text-main);">0</div>
+					</div>
+				</div>
+
+				<button class="btn btn-primary" onclick="restartGame()" style="width: 100%; background: linear-gradient(135deg, var(--accent-neon-pink) 0%, var(--accent-neon-purple) 100%); border: none; font-weight: 700;">
+					<i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i>
+					VOLVER A JUGAR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud" style="display: none;">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot" style="background-color: var(--accent-neon-pink); animation: pulse 1.5s infinite;"></div>
+					<span style="letter-spacing: 1.5px; font-weight: 700;">ORBITAL DEFENSE ACTIVE</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Space Panel (Stats) -->
+			<div class="space-hud-panel hud-interactive">
+				<!-- Temporizador -->
+				<div class="timer-container">
+					<div class="timer-bar" id="game-timer-bar"></div>
+				</div>
+
+				<div class="hud-stats-row">
+					<div class="stat-box">
+						<div class="stat-label">SCORE</div>
+						<div class="stat-value" id="hud-score">0000</div>
+					</div>
+					<div style="border-left: 1px solid rgba(255,255,255,0.08); height: 32px;"></div>
+					<div class="stat-box">
+						<div class="stat-label">DISPAROS</div>
+						<div class="stat-value" id="hud-shots">0</div>
+					</div>
+					<div style="border-left: 1px solid rgba(255,255,255,0.08); height: 32px;"></div>
+					<div class="stat-box">
+						<div class="stat-label">PRECISIÓN</div>
+						<div class="stat-value pink" id="hud-accuracy">0%</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+			import { LoaderController } from './src/ui/loader.js';
+
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const loaderController = new LoaderController();
+
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			// Variables de Estado del Juego
+			let score = 0;
+			let shots = 0;
+			let hits = 0;
+			let timeLeft = 60; // 60 segundos
+			let gameInterval = null;
+			let isPlaying = false;
+			let audioCtx = null;
+
+			// Definición de las criaturas enemigas
+			const enemiesData = [
+				{ id: 'mob-bat1', name: 'Murciélago Alpha', model: '#model-bat-toon', scale: '0.4 0.4 0.4', baseElevation: 1.5, points: 10, dist: 5, angle: 0, orbitSpeed: 0.15 },
+				{ id: 'mob-drone', name: 'Security Drone', model: '#model-drone', scale: '0.35 0.35 0.35', baseElevation: 0.8, points: 25, dist: 6.5, angle: 120, orbitSpeed: -0.22 },
+				{ id: 'mob-bat2', name: 'Murciélago Beta', model: '#model-bat-hd', scale: '0.4 0.4 0.4', baseElevation: 2.2, points: 10, dist: 4.5, angle: 240, orbitSpeed: 0.12 }
+			];
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = initGame;
+			});
+
+			function initGame() {
+				// Inicializar contexto de audio en la interacción del usuario
+				try {
+					audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+				} catch (e) {
+					console.warn("Web Audio no soportado", e);
+				}
+
+				loaderController.show("Calibrando matriz de defensa y posicionando satélites...");
+				
+				// Iniciar tracking de GPS (Girona coordenadas por defecto)
+				const centerLat = 41.296611;
+				const centerLng = 2.760382;
+				gpsService.setTarget(centerLat, centerLng);
+
+				gpsService.startTracking(
+					() => {},
+					(err) => telemetryService.logError(err, 'gameSpaceGPS')
+				);
+
+				const userLat = centerLat;
+				const userLng = centerLng;
+
+				// Generar las posiciones GPS iniciales para cada enemigo basado en su distancia y ángulo
+				const spawnedEnemiesHtml = enemiesData.map((enemy) => {
+					const angleRad = enemy.angle * Math.PI / 180;
+					
+					// Convertir distancia y ángulo en desfase de latitud/longitud
+					const latOffset = (enemy.dist * Math.cos(angleRad)) / 111111;
+					const lngOffset = (enemy.dist * Math.sin(angleRad)) / (111111 * Math.cos(userLat * Math.PI / 180));
+					
+					const enemyLat = userLat + latOffset;
+					const enemyLng = userLng + lngOffset;
+
+					return `
+						<!-- Ancla GPS -->
+						<a-entity 
+							id="anchor-${enemy.id}" 
+							anchor-manager="lat: ${enemyLat}; lng: ${enemyLng}; elevation: 0;"
+						>
+							<!-- Contenedor animado local para órbita y oscilación -->
+							<a-entity id="wrap-${enemy.id}">
+								<!-- El modelo 3D del enemigo -->
+								<a-entity
+									id="${enemy.id}"
+									gltf-model="${enemy.model}"
+									scale="${enemy.scale}"
+									animation-mixer="clip: *; loop: repeat;"
+									class="space-target-mob"
+									data-points="${enemy.points}"
+								>
+									<!-- Etiqueta Holográfica -->
+									<a-text 
+										value="${enemy.name}" 
+										position="0 1.2 0" 
+										align="center" 
+										color="#00f3ff" 
+										width="3" 
+										wrap-count="12"
+										material="shader: flat;"
+									></a-text>
+									
+									<!-- Escudo de energía visual -->
+									<a-sphere
+										radius="0.7"
+										color="#00f3ff"
+										opacity="0.1"
+										material="wireframe: true; shader: flat;"
+										animation="property: rotation; to: 360 360 0; dur: 4000; loop: true; easing: linear"
+									></a-sphere>
+								</a-entity>
+							</a-entity>
+						</a-entity>
+					`;
+				}).join('');
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+						space-defense-engine
+					>
+						<a-assets>
+							<a-asset-item id="model-bat-toon" src="./assets/toon-bat.glb"></a-asset-item>
+							<a-asset-item id="model-bat-hd" src="./assets/Bat.glb"></a-asset-item>
+							<a-asset-item id="model-drone" src="./assets/Sweeper.glb"></a-asset-item>
+						</a-assets>
+
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#00f3ff" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- Inyección de Enemigos -->
+						${spawnedEnemiesHtml}
+
+						<a-camera id="cam-defense" position="0 1.6 0"></a-camera>
+					</a-scene>
+				`;
+
+				// Ocultar pantalla de config y mostrar HUD de juego
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+					document.getElementById('radar-widget-el').style.display = 'flex';
+
+					// Escuchar cuando el primer ancla se fije
+					const firstAnchor = document.getElementById(`anchor-${enemiesData[0].id}`);
+					if (firstAnchor) {
+						firstAnchor.addEventListener('anchor-placed', () => {
+							loaderController.hide();
+							startGameLoop();
+						}, { once: true });
+					}
+					
+					// Respaldo de carga
+					setTimeout(() => {
+						loaderController.hide();
+						if (!isPlaying) startGameLoop();
+					}, 5000);
+
+				}, 500);
+			}
+
+			// Iniciar juego
+			function startGameLoop() {
+				isPlaying = true;
+				score = 0;
+				shots = 0;
+				hits = 0;
+				timeLeft = 60;
+				
+				document.getElementById('hud-score').innerText = '0000';
+				document.getElementById('hud-shots').innerText = '0';
+				document.getElementById('hud-accuracy').innerText = '0%';
+				document.getElementById('game-timer-bar').style.width = '100%';
+
+				// Sonido de inicio (Web Audio API)
+				playSynthesizedNote(261.63, 0.15, 'sine'); // Do
+				setTimeout(() => playSynthesizedNote(329.63, 0.15, 'sine'), 150); // Mi
+				setTimeout(() => playSynthesizedNote(392.00, 0.25, 'sine'), 300); // Sol
+				setTimeout(() => playSynthesizedNote(523.25, 0.4, 'sawtooth'), 450); // Do Octava
+
+				// Intervalo del cronómetro (1 segundo)
+				gameInterval = setInterval(() => {
+					timeLeft--;
+					const timerBar = document.getElementById('game-timer-bar');
+					if (timerBar) {
+						const percentage = (timeLeft / 60) * 100;
+						timerBar.style.width = `${percentage}%`;
+						
+						// Animación de advertencia si queda poco tiempo
+						if (timeLeft <= 10) {
+							timerBar.style.boxShadow = '0 0 15px #ff2a74';
+							playSynthesizedNote(600, 0.08, 'sine');
+						}
+					}
+
+					if (timeLeft <= 0) {
+						endGame();
+					}
+				}, 1000);
+			}
+
+			// Finalizar Juego (Game Over)
+			function endGame() {
+				isPlaying = false;
+				clearInterval(gameInterval);
+
+				// Sonido de Game Over (melodía triste)
+				playSynthesizedNote(392.00, 0.2, 'triangle');
+				setTimeout(() => playSynthesizedNote(349.23, 0.2, 'triangle'), 200);
+				setTimeout(() => playSynthesizedNote(311.13, 0.2, 'triangle'), 400);
+				setTimeout(() => playSynthesizedNote(246.94, 0.6, 'sine'), 600);
+
+				// Rellenar estadísticas del panel de fin
+				document.getElementById('go-score').innerText = score;
+				const acc = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+				document.getElementById('go-accuracy').innerText = `${acc}%`;
+				document.getElementById('go-hits').innerText = hits;
+				document.getElementById('go-shots').innerText = shots;
+
+				// Mostrar Pantalla de Game Over
+				document.getElementById('game-over-screen-el').style.display = 'flex';
+			}
+
+			// Reiniciar Juego
+			function restartGame() {
+				document.getElementById('game-over-screen-el').style.display = 'none';
+				startGameLoop();
+			}
+
+			// Registrar Componente del Motor del Juego en A-Frame
+			if (!AFRAME.components['space-defense-engine']) {
+				AFRAME.registerComponent('space-defense-engine', {
+					init: function() {
+						this.projectiles = [];
+						this.timeAccumulator = 0;
+
+						// Registrar clic de disparo
+						window.addEventListener('click', (e) => {
+							if (!isPlaying) return;
+							// Ignorar si hace click en algún elemento interactivo del HUD
+							if (e.target.closest('.hud-interactive')) return;
+							this.fireLaser();
+						});
+					},
+					fireLaser: function() {
+						const cameraEl = document.getElementById('cam-defense');
+						if (!cameraEl) return;
+
+						shots++;
+						document.getElementById('hud-shots').innerText = shots;
+						updateAccuracyHUD();
+
+						// Posición inicial del láser (cámara)
+						const camPos = cameraEl.object3D.position;
+
+						// Vector de dirección de la cámara (invertido porque en ThreeJS mira hacia atrás)
+						const direction = new THREE.Vector3();
+						cameraEl.object3D.getWorldDirection(direction);
+						direction.multiplyScalar(-1);
+
+						// Crear Entidad Láser en A-Frame
+						const laser = document.createElement('a-entity');
+						
+						// Posicionar un poco hacia la derecha y abajo para simular disparo de arma espacial
+						const startPos = new THREE.Vector3(camPos.x, camPos.y - 0.15, camPos.z);
+						laser.setAttribute('position', `${startPos.x} ${startPos.y} ${startPos.z}`);
+						
+						// Renderizado del Láser (Cilindro neon horizontal flotante)
+						laser.innerHTML = `
+							<a-cylinder
+								radius="0.012"
+								height="0.5"
+								color="#ff2a74"
+								material="shader: flat; emissive: #ff2a74; emissiveIntensity: 2;"
+								rotation="90 0 0"
+							></a-cylinder>
+						`;
+
+						this.el.appendChild(laser);
+
+						// Alinear el cilindro con la trayectoria
+						const laserTarget = new THREE.Vector3().addVectors(startPos, direction);
+						laser.object3D.lookAt(laserTarget);
+
+						// Añadir proyectil a la lista física
+						const laserSpeed = 26; // m/s
+						this.projectiles.push({
+							el: laser,
+							position: startPos.clone(),
+							velocity: direction.clone().multiplyScalar(laserSpeed),
+							life: 0
+						});
+
+						// Sonido de disparo espacial sintetizado
+						playLaserSound();
+					},
+					tick: function(time, timeDelta) {
+						const dt = timeDelta / 1000; // segundos
+						this.timeAccumulator += dt;
+
+						// 1. Animar el movimiento orbital/oscilación local de los enemigos en A-Frame
+						enemiesData.forEach((enemy) => {
+							const wrapEl = document.getElementById(`wrap-${enemy.id}`);
+							const modelEl = document.getElementById(enemy.id);
+							if (!wrapEl || !modelEl) return;
+
+							// Incrementar el ángulo orbital
+							enemy.angle += enemy.orbitSpeed * dt * 35; // velocidad escalada
+							const angleRad = enemy.angle * Math.PI / 180;
+
+							// Movimiento circular local alrededor del ancla
+							const localX = Math.cos(angleRad) * 1.5;
+							const localZ = Math.sin(angleRad) * 1.5;
+							
+							// Oscilación arriba/abajo en eje Y
+							const localY = enemy.baseElevation + Math.sin(time / 600 + enemy.angle) * 0.35;
+
+							wrapEl.setAttribute('position', `${localX} ${localY} ${localZ}`);
+							
+							// Rotación para mirar hacia el centro (jugador)
+							modelEl.setAttribute('rotation', `0 ${-enemy.angle + 90} 0`);
+						});
+
+						// 2. Controlar la física y colisiones de los láseres activos
+						for (let i = this.projectiles.length - 1; i >= 0; i--) {
+							const p = this.projectiles[i];
+							p.life += dt;
+
+							// Avanzar posición del proyectil
+							p.position.addScaledVector(p.velocity, dt);
+							p.el.setAttribute('position', p.position);
+
+							// Comprobar colisiones con cada criatura
+							let collided = false;
+							for (let j = 0; j < enemiesData.length; j++) {
+								const enemy = enemiesData[j];
+								const modelEl = document.getElementById(enemy.id);
+								if (!modelEl) continue;
+
+								// Obtener posición global en el mundo de A-Frame
+								const enemyGlobalPos = new THREE.Vector3();
+								modelEl.object3D.getWorldPosition(enemyGlobalPos);
+
+								// Distancia tridimensional al láser
+								const distance = p.position.distanceTo(enemyGlobalPos);
+								if (distance < 0.75) {
+									// ¡Colisión exitosa!
+									this.triggerImpact(p.el, modelEl, enemyGlobalPos, enemy.points);
+									this.projectiles.splice(i, 1);
+									collided = true;
+									break;
+								}
+							}
+
+							if (collided) continue;
+
+							// Destruir láser tras 3 segundos o si se aleja demasiado
+							if (p.life > 3.0) {
+								p.el.remove();
+								this.projectiles.splice(i, 1);
+							}
+						}
+
+						// 3. Actualizar Radar HUD en tiempo real
+						this.updateRadar();
+					},
+					triggerImpact: function(laserEl, targetEl, hitPos, points) {
+						// Remover láser impactado
+						laserEl.remove();
+
+						hits++;
+						score += points;
+						
+						// Actualizar marcador con formato 0000
+						let scoreStr = score.toString();
+						while (scoreStr.length < 4) scoreStr = '0' + scoreStr;
+						document.getElementById('hud-score').innerText = scoreStr;
+						updateAccuracyHUD();
+
+						// Sonido de explosión sintetizado
+						playExplosionSound();
+
+						// Partículas de explosión neon
+						this.spawnImpactParticles(hitPos);
+
+						// Reacción animada del enemigo (Destello rápido de color blanco/rosa)
+						targetEl.setAttribute('animation__hit', {
+							property: 'scale',
+							from: '0.1 0.1 0.1',
+							to: targetEl.getAttribute('scale'),
+							dur: 300,
+							easing: 'easeOutElastic'
+						});
+
+						// Reposicionar el enemigo de forma aleatoria alrededor del usuario
+						const newAngle = Math.random() * 360;
+						const newDist = 4.5 + Math.random() * 3;
+						const targetId = targetEl.getAttribute('id');
+						const enemyIndex = enemiesData.findIndex(e => e.id === targetId);
+
+						if (enemyIndex !== -1) {
+							enemiesData[enemyIndex].angle = newAngle;
+							enemiesData[enemyIndex].dist = newDist;
+
+							// Reubicar el ancla GPS
+							const anchorEl = document.getElementById(`anchor-${targetId}`);
+							if (anchorEl) {
+								const centerLat = 41.296611;
+								const centerLng = 2.760382;
+								const angleRad = newAngle * Math.PI / 180;
+								
+								const latOffset = (newDist * Math.cos(angleRad)) / 111111;
+								const lngOffset = (newDist * Math.sin(angleRad)) / (111111 * Math.cos(centerLat * Math.PI / 180));
+								
+								anchorEl.setAttribute('anchor-manager', {
+									lat: centerLat + latOffset,
+									lng: centerLng + lngOffset,
+									elevation: 0
+								});
+							}
+						}
+					},
+					spawnImpactParticles: function(pos) {
+						// Generar ráfaga de 10 esferas de luz
+						for (let i = 0; i < 10; i++) {
+							const p = document.createElement('a-sphere');
+							p.setAttribute('radius', '0.04');
+							// Alternancia de colores neón
+							p.setAttribute('color', i % 2 === 0 ? '#00f3ff' : '#ff2a74');
+							p.setAttribute('material', 'shader: flat; emissive: #fff; emissiveIntensity: 1.5;');
+							p.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+
+							// Vectores de velocidad aleatoria en 3D
+							const theta = Math.random() * Math.PI * 2;
+							const phi = Math.acos((Math.random() * 2) - 1);
+							const speed = 2.5 + Math.random() * 3.5;
+
+							const vx = speed * Math.sin(phi) * Math.cos(theta);
+							const vy = speed * Math.sin(phi) * Math.sin(theta);
+							const vz = speed * Math.cos(phi);
+
+							this.el.appendChild(p);
+
+							// Animaciones físicas en A-Frame
+							p.setAttribute('animation__pos', {
+								property: 'position',
+								to: `${pos.x + vx} ${pos.y + vy} ${pos.z + vz}`,
+								dur: 600,
+								easing: 'easeOutQuad'
+							});
+							p.setAttribute('animation__scale', {
+								property: 'scale',
+								to: '0 0 0',
+								dur: 600,
+								easing: 'easeOutQuad'
+							});
+
+							// Auto-destrucción
+							setTimeout(() => p.remove(), 600);
+						}
+					},
+					updateRadar: function() {
+						const cameraEl = document.getElementById('cam-defense');
+						const radarDotsContainer = document.getElementById('radar-dots-container');
+						if (!cameraEl || !radarDotsContainer) return;
+
+						// Limpiar puntos antiguos del radar
+						radarDotsContainer.innerHTML = '';
+
+						// Obtener rotación en el eje Y de la cámara (hacia donde mira el usuario)
+						const camRotY = cameraEl.object3D.rotation.y;
+
+						enemiesData.forEach((enemy) => {
+							const modelEl = document.getElementById(enemy.id);
+							if (!modelEl) return;
+
+							// Obtener posición del enemigo en el espacio del mundo
+							const enemyGlobalPos = new THREE.Vector3();
+							modelEl.object3D.getWorldPosition(enemyGlobalPos);
+
+							const camGlobalPos = new THREE.Vector3();
+							cameraEl.object3D.getWorldPosition(camGlobalPos);
+
+							// Vector relativo (Jugador -> Enemigo) proyectado en el plano X-Z
+							const dx = enemyGlobalPos.x - camGlobalPos.x;
+							const dz = enemyGlobalPos.z - camGlobalPos.z;
+
+							// Ángulo absoluto en el espacio y relativo al ángulo del jugador
+							const angleAbs = Math.atan2(dx, dz);
+							const relativeAngle = angleAbs + camRotY + Math.PI; // Ajustar desfase de orientación
+
+							// Calcular distancia escalada para el radar (máximo 12 metros)
+							const distance = Math.sqrt(dx*dx + dz*dz);
+							const maxRadarDist = 10;
+							const radiusPx = 32; // Radio máximo en píxeles dentro del radar
+							const r = Math.min(distance / maxRadarDist, 1.0) * radiusPx;
+
+							// Convertir coordenadas polares a cartesianas en píxeles
+							const xPx = 40 + r * Math.sin(relativeAngle);
+							const yPx = 40 + r * Math.cos(relativeAngle);
+
+							// Pintar el punto en el radar
+							const dot = document.createElement('div');
+							dot.className = 'radar-dot';
+							dot.style.left = `${xPx}px`;
+							dot.style.top = `${yPx}px`;
+							
+							// Dron tiene color azul, murciélagos rosa
+							if (enemy.id === 'mob-drone') {
+								dot.style.background = 'var(--accent-neon-blue)';
+								dot.style.boxShadow = '0 0 8px var(--accent-neon-blue)';
+							}
+
+							radarDotsContainer.appendChild(dot);
+						});
+					}
+				});
+			}
+
+			function updateAccuracyHUD() {
+				const acc = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+				document.getElementById('hud-accuracy').innerText = `${acc}%`;
+			}
+
+			// ==========================================
+			// Módulo de Audio y Sintetizadores Analógicos
+			// ==========================================
+
+			// Nota simple para melodías
+			function playSynthesizedNote(freq, duration, type = 'sine') {
+				if (!audioCtx) return;
+				try {
+					if (audioCtx.state === 'suspended') {
+						audioCtx.resume();
+					}
+					const osc = audioCtx.createOscillator();
+					const gain = audioCtx.createGain();
+
+					osc.type = type;
+					osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+					gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+					gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+					osc.connect(gain);
+					gain.connect(audioCtx.destination);
+
+					osc.start();
+					osc.stop(audioCtx.currentTime + duration);
+				} catch(err) {
+					console.warn(err);
+				}
+			}
+
+			// Láser de ciencia ficción (barrido de frecuencia descendente rápido)
+			function playLaserSound() {
+				if (!audioCtx) return;
+				try {
+					if (audioCtx.state === 'suspended') audioCtx.resume();
+
+					const osc = audioCtx.createOscillator();
+					const gain = audioCtx.createGain();
+
+					osc.type = 'sawtooth';
+					// Empieza agudo y baja a grave extremadamente rápido
+					osc.frequency.setValueAtTime(900, audioCtx.currentTime);
+					osc.frequency.exponentialRampToValueAtTime(180, audioCtx.currentTime + 0.14);
+
+					gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+					gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.14);
+
+					osc.connect(gain);
+					gain.connect(audioCtx.destination);
+
+					osc.start();
+					osc.stop(audioCtx.currentTime + 0.14);
+				} catch(e) {
+					console.warn(e);
+				}
+			}
+
+			// Explosión de impacto (barrido de frecuencia de bajo espectro con distorsión)
+			function playExplosionSound() {
+				if (!audioCtx) return;
+				try {
+					if (audioCtx.state === 'suspended') audioCtx.resume();
+
+					const osc = audioCtx.createOscillator();
+					const gain = audioCtx.createGain();
+
+					osc.type = 'triangle';
+					osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+					osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.35);
+
+					gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+					gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+
+					// Filtro de paso bajo para darle cuerpo de impacto pesado
+					const filter = audioCtx.createBiquadFilter();
+					filter.type = 'lowpass';
+					filter.frequency.value = 400;
+
+					osc.connect(filter);
+					filter.connect(gain);
+					gain.connect(audioCtx.destination);
+
+					osc.start();
+					osc.stop(audioCtx.currentTime + 0.35);
+				} catch(e) {
+					console.warn(e);
+				}
+			}
+
+			// Exponer funciones globales
+			window.restartGame = restartGame;
+		</script>
+	</body>
+</html>
