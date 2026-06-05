@@ -1,0 +1,29 @@
+[
+  {
+    "id": "catedral_girona",
+    "nombre": "Catedral de Santa María",
+    "lat": 41.987679,
+    "lng": 2.826359,
+    "modelo": "Chair",
+    "imagenReferencia": "./assets/images/cathedral_target.jpg",
+    "descripcion": "La Catedral de Girona cuenta con la nave gótica más ancha del mundo y una majestuosa escalinata barroca de 90 peldaños."
+  },
+  {
+    "id": "pont_pedra",
+    "nombre": "Pont de Pedra",
+    "lat": 41.982161,
+    "lng": 2.823902,
+    "modelo": "GeoPlanter",
+    "imagenReferencia": "./assets/images/bridge_target.jpg",
+    "descripcion": "Construido en 1856 bajo el reinado de Isabel II, es el puente peatonal más transitado y tradicional sobre el río Onyar."
+  },
+  {
+    "id": "pont_eiffel",
+    "nombre": "Pont de les Peixateries Velles (Eiffel)",
+    "lat": 41.984444,
+    "lng": 2.824722,
+    "modelo": "Chair",
+    "imagenReferencia": "./assets/images/eiffel_target.jpg",
+    "descripcion": "Famoso puente de estructura metálica roja diseñado por Gustave Eiffel poco antes de levantar la Torre Eiffel en París."
+  }
+]

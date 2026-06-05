@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Interactive 3D Web Cube</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #a855f7;
+            --accent: #ec4899;
+            --bg: #0f172a;
+            --face-bg: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Styling for the cube faces */
+        .face {
+            width: 400px;
+            height: 400px;
+            background: var(--face-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            box-sizing: border-box;
+            user-select: none;
+            overflow: hidden;
+            pointer-events: auto; /* Ensure events pass to HTML */
+        }
+
+        .face h1 {
+            margin: 0 0 16px 0;
+            font-size: 24px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .face p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #94a3b8;
+            margin-bottom: 20px;
+        }
+
+        .face-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        input, textarea, button {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: white;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: auto;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* Specific styles for different faces */
+        .face.contact { border-left: 4px solid var(--accent); }
+        .face.settings { border-left: 4px solid var(--primary); }
+        .face.about { border-left: 4px solid var(--secondary); }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stat-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Glassmorphism background effect */
+        .blob {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            filter: blur(100px);
+            opacity: 0.2;
+            z-index: -1;
+            border-radius: 50%;
+            animation: drift 20s infinite alternate;
+        }
+
+        @keyframes drift {
+            from { transform: translate(-20%, -20%); }
+            to { transform: translate(20%, 20%); }
+        }
+    </style>
+</head>
+<body>
+    <div class="blob"></div>
+    <div id="ui-overlay">
+        <div class="badge">Three.js Interactive CSS3D Cube</div>
+    </div>
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+
+        let camera, scene, renderer;
+        let controls;
+
+        const FACE_SIZE = 400;
+        const CUBE_OFFSET = FACE_SIZE / 2;
+
+        init();
+        animate();
+
+        function createFaceContent(type, title, content) {
+            const element = document.createElement('div');
+            element.className = `face ${type}`;
+            
+            let innerHTML = `<h1>${title}</h1><p>${content}</p><div class="face-content">`;
+
+            if (type === 'contact') {
+                innerHTML += `
+                    <div class="input-group">
+                        <label>Name</label>
+                        <input type="text" placeholder="John Doe">
+                    </div>
+                    <div class="input-group">
+                        <label>Message</label>
+                        <textarea rows="4" placeholder="Your message here..."></textarea>
+                    </div>
+                    <button onclick="alert('Message Sent (Simulated)')">Send Message</button>
+                `;
+            } else if (type === 'settings') {
+                innerHTML += `
+                    <div class="stat-card">
+                        <div class="stat-icon">⚙️</div>
+                        <div>
+                            <div style="font-size: 12px; color: #64748b;">System Load</div>
+                            <div style="font-weight: bold;">42%</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: var(--accent);">🔋</div>
+                        <div>
+                            <div style="font-size: 12px; color: #64748b;">Battery</div>
+                            <div style="font-weight: bold;">88%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <label style="display: block; margin-bottom: 8px;">Theme Density</label>
+                        <input type="range" style="width: 100%;">
+                    </div>
+                `;
+            } else {
+                innerHTML += `
+                    <div class="stat-card">
+                        <div style="font-size: 13px;">Experience the fusion of 3D space and web interaction. Each face of this cube is a real HTML element.</div>
+                    </div>
+                    <div style="margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: var(--primary);">Interactive</span>
+                        <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: var(--secondary);">Web Core</span>
+                        <span class="badge" style="background: rgba(236, 72, 153, 0.2); color: var(--accent);">Premium UI</span>
+                    </div>
+                `;
+            }
+
+            innerHTML += `</div>`;
+            element.innerHTML = innerHTML;
+            
+            // Add click events manually to the button inside the face
+            const btn = element.querySelector('button');
+            if (btn) {
+                btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+            }
+
+            return element;
+        }
+
+        function init() {
+            const container = document.getElementById('container');
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 5000);
+            camera.position.set(600, 600, 1000);
+
+            scene = new THREE.Scene();
+
+            // Create Cube Sides
+            const sides = [
+                { pos: [CUBE_OFFSET, 0, 0], rot: [0, Math.PI / 2, 0], type: 'about', title: 'Interactive Web', content: 'Each side is fully interactive. You can select text, use inputs, and click buttons directly on the cube.' },
+                { pos: [-CUBE_OFFSET, 0, 0], rot: [0, -Math.PI / 2, 0], type: 'contact', title: 'Get in Touch', content: 'Fill out the form below to contact our support team or just say hello!' },
+                { pos: [0, CUBE_OFFSET, 0], rot: [-Math.PI / 2, 0, 0], type: 'settings', title: 'System Info', content: 'Real-time monitoring of your application performance and system resources.' },
+                { pos: [0, -CUBE_OFFSET, 0], rot: [Math.PI / 2, 0, 0], type: 'about', title: 'Modern Stack', content: 'Built with Three.js, CSS3DRenderer, and Vanilla CSS for maximum performance.' },
+                { pos: [0, 0, CUBE_OFFSET], rot: [0, 0, 0], type: 'settings', title: 'Welcome', content: 'Rotate the cube using your mouse to explore the different web components.' },
+                { pos: [0, 0, -CUBE_OFFSET], rot: [0, Math.PI, 0], type: 'contact', title: 'Configuration', content: 'Adjust your preferences and system settings to customize your workspace.' }
+            ];
+
+            for (const side of sides) {
+                const element = createFaceContent(side.type, side.title, side.content);
+                const object = new CSS3DObject(element);
+                object.position.set(...side.pos);
+                object.rotation.set(...side.rot);
+                scene.add(object);
+            }
+
+            // Renderer
+            renderer = new CSS3DRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.rotateSpeed = 0.5;
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>

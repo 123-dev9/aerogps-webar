@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS WebAR - Guía Turística de Girona</title>
+		
+		<!-- SEO Meta Tags -->
+		<meta name="description" content="Guía turística inmersiva de Girona. Explora monumentos en Realidad Aumentada móvil." />
+		
+		<!-- PWA Manifest -->
+		<link rel="manifest" href="./manifest.json" />
+		<meta name="theme-color" content="#4f46e5" />
+		<link rel="apple-touch-icon" href="./assets/images/icon-192.png" />
+
+		<!-- Fuentes Premium (Google Fonts) -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos (Lucide Icons via CDN) -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+
+		<!-- MapLibre GL (Librería de Mapas Vectoriales Open Source) -->
+		<link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+		<script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+
+		<!-- Hojas de Estilo Separadas -->
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+		<!-- Módulos de Lógica ES6 -->
+		<script type="module" src="./src/main.js"></script>
+	</head>
+
+	<body>
+		<!-- Glows de Fondo -->
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1"></div>
+			<div class="glow-orb orb-2"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA / MENSAJES -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader"></div>
+			<p id="loading-text">Obteniendo permisos de GPS y Cámara...</p>
+		</div>
+
+		<!-- PANTALLA DE CONFIGURACIÓN (LANDING & MAPA) -->
+		<div id="config-screen">
+			<div class="logo-container">
+				<div class="logo-icon">
+					<i data-lucide="navigation" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>AeroGPS Girona</h1>
+				<p>Rutas Turísticas WebAR</p>
+			</div>
+
+			<!-- Botón de instalación PWA -->
+			<button id="pwa-install-btn">📲 Instalar Aplicación Móvil</button>
+
+			<div class="panel">
+				<!-- Paso 1: Selector de Monumento en el Mapa -->
+				<div>
+					<div class="section-title">
+						<i data-lucide="map" style="width: 16px; height: 16px;"></i>
+						<span>1. Mapa de Monumentos (Girona)</span>
+					</div>
+					<p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
+						Toca un marcador en el mapa para abrir la ficha del monumento y activar su visor de Realidad Aumentada.
+					</p>
+					<!-- Contenedor del Mapa MapLibre -->
+					<div id="map-container"></div>
+				</div>
+
+				<!-- Paso 2: Coordenadas GPS (Fallback de Pruebas / Ajuste Manual) -->
+				<div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;">
+					<div class="section-title">
+						<i data-lucide="settings-2" style="width: 16px; height: 16px;"></i>
+						<span>2. Ajuste de Coordenadas Manual</span>
+					</div>
+					<div class="model-grid" style="margin-bottom: 12px;">
+						<div class="model-card active" onclick="selectModel('Chair', 'Silla')" id="card-Chair">
+							<span>Silla</span>
+							<small>Chair.glb</small>
+						</div>
+						<div class="model-card" onclick="selectModel('GeoPlanter', 'Planter')" id="card-GeoPlanter">
+							<span>Planter</span>
+							<small>GeoPlanter.glb</small>
+						</div>
+					</div>
+					<div class="coord-inputs">
+						<div class="input-wrapper">
+							<label for="lat-input">Latitud Objetivo</label>
+							<input type="number" id="lat-input" step="0.000001" class="input-field" placeholder="Ej. 41.987679" />
+						</div>
+						<div class="input-wrapper">
+							<label for="lng-input">Longitud Objetivo</label>
+							<input type="number" id="lng-input" step="0.000001" class="input-field" placeholder="Ej. 2.826359" />
+						</div>
+					</div>
+					<div class="btn-row" style="margin-top: 12px;">
+						<button class="btn btn-gps" onclick="getCurrentGPS()">
+							<i data-lucide="locate-fixed" style="width: 15px; height: 15px;"></i>
+							Obtener GPS Actual
+						</button>
+						<button class="btn btn-offset" onclick="setOffsetGPS()">
+							<i data-lucide="arrow-up-right" style="width: 15px; height: 15px;"></i>
+							Colocar a 5 metros (Prueba rápida)
+						</button>
+					</div>
+					<button class="btn btn-primary" onclick="startAR()" style="width: 100%; margin-top: 12px;">
+						<i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
+						INICIAR AR MANUAL
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container">
+			<!-- A-Frame Scene se inyectará aquí dinámicamente -->
+		</div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="stopAR()">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot"></div>
+					<span>VISOR MONUMENTAL ACTIVO</span>
+				</div>
+			</div>
+
+			<!-- HUD Control Sidebar (Ajustes de Escala, Rotación y Elevación) -->
+			<div class="hud-controls-sidebar hud-interactive">
+				<div class="sidebar-tool" onclick="toggleSlider('scale')">
+					<div class="sidebar-btn" id="btn-scale">
+						<i data-lucide="maximize" style="width: 18px; height: 18px;"></i>
+					</div>
+					<span>Escala</span>
+				</div>
+				<div class="sidebar-tool" onclick="toggleSlider('rotation')">
+					<div class="sidebar-btn" id="btn-rotation">
+						<i data-lucide="rotate-3d" style="width: 18px; height: 18px;"></i>
+					</div>
+					<span>Rotación</span>
+				</div>
+				<div class="sidebar-tool" onclick="toggleSlider('elevation')">
+					<div class="sidebar-btn" id="btn-elevation">
+						<i data-lucide="arrow-up-down" style="width: 18px; height: 18px;"></i>
+					</div>
+					<span>Altura</span>
+				</div>
+			</div>
+
+			<!-- Panel Deslizante de Ajuste (Se muestra según la selección del Sidebar) -->
+			<div class="slider-overlay-panel hud-interactive" id="slider-panel">
+				<div class="slider-header">
+					<span id="slider-title">Ajuste de Escala</span>
+					<span id="slider-value">1.0x</span>
+				</div>
+				<input type="range" id="slider-input" min="0.1" max="10" step="0.05" value="1" class="slider-control" />
+			</div>
+
+			<!-- HUD Bottom Info Card -->
+			<div class="hud-bottom hud-interactive">
+				<div class="hud-info-grid">
+					<div class="hud-stat">
+						<span class="hud-stat-label">Monumento</span>
+						<span class="hud-stat-val" id="hud-model-name">Catedral</span>
+					</div>
+					<div class="hud-stat">
+						<span class="hud-stat-label">Dirección / Brújula</span>
+						<div class="compass-container">
+							<div class="compass-arrow-wrapper">
+								<div class="compass-arrow" id="compass-arrow"></div>
+							</div>
+							<span class="hud-stat-val" id="hud-bearing">--°</span>
+						</div>
+					</div>
+				</div>
+				
+				<div class="hud-info-grid" style="border: none; padding-bottom: 0;">
+					<div class="hud-stat">
+						<span class="hud-stat-label">Distancia al Objetivo</span>
+						<span class="hud-stat-val distance" id="hud-distance">Calculando...</span>
+					</div>
+					<div class="hud-stat">
+						<span class="hud-stat-label">Coordenadas</span>
+						<span class="hud-stat-val" id="hud-target-gps" style="font-size: 12px; font-family: 'Space Grotesk', sans-serif;">--</span>
+					</div>
+				</div>
+
+				<!-- Barra de Estado Inferior -->
+				<div class="hud-status-bar">
+					<div class="status-item">
+						<div class="status-dot"></div>
+						<span id="gps-accuracy-text">GPS: Sincronizando...</span>
+					</div>
+					<span id="device-heading-text">Sensor: --</span>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

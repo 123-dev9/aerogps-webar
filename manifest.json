@@ -1,0 +1,21 @@
+{
+  "short_name": "AeroGPS WebAR",
+  "name": "AeroGPS WebAR - Guía Turística de Girona",
+  "icons": [
+    {
+      "src": "./assets/images/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "./assets/images/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0a0e1a",
+  "theme_color": "#4f46e5",
+  "display": "standalone",
+  "orientation": "portrait"
+}

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgpu - materials - html texture (WebXR)</title>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+		/>
+		<style>
+			* {
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: #111;
+				color: #fff;
+				font-family: sans-serif;
+			}
+			#info {
+				position: absolute;
+				top: 8px;
+				left: 8px;
+				z-index: 10;
+				background: rgba(0, 0, 0, 0.5);
+				padding: 8px 12px;
+				border-radius: 6px;
+				font-size: 13px;
+				pointer-events: none;
+				user-select: none;
+			}
+			#info a {
+				color: #7cf;
+			}
+			#draw_element {
+				width: 600px;
+				height: 600px;
+				background-color: #ffffff;
+				color: #000000;
+				font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+				display: flex;
+				align-items: stretch;
+				justify-content: stretch;
+				padding: 0;
+				overflow: hidden;
+			}
+			#draw_element a {
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				align-items: center;
+				width: 100%;
+				height: 100%;
+				text-decoration: none;
+				color: #4285f4;
+				transition: background 0.3s, transform 0.3s;
+				border: 20px solid #4285f4;
+			}
+			#draw_element a:hover {
+				background-color: #f8f9fa;
+				color: #ea4335;
+				border-color: #ea4335;
+			}
+			#draw_element .google-logo {
+				font-size: 120px;
+				font-weight: bold;
+				margin-bottom: 20px;
+				letter-spacing: -5px;
+			}
+			#draw_element .visit-text {
+				font-size: 40px;
+				color: #34a853;
+				font-weight: bold;
+			}
+			@keyframes swing {
+				from {
+					transform: rotate(-15deg);
+				}
+				to {
+					transform: rotate(15deg);
+				}
+			}
+			/* VR/AR addons set bottom + centered left — they stack. Flex bar + !important wins over inline. */
+			#xr-enter-bar {
+				position: fixed;
+				bottom: 16px;
+				right: 16px;
+				left: auto;
+				display: flex;
+				flex-direction: row;
+				gap: 10px;
+				align-items: stretch;
+				z-index: 10000;
+				user-select: none;
+			}
+			#xr-enter-bar > button,
+			#xr-enter-bar > a {
+				position: relative !important;
+				left: auto !important;
+				right: auto !important;
+				bottom: auto !important;
+				width: auto !important;
+				min-width: 108px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="info">
+			three.js — HTML as a texture in <b>WebXR</b><br />
+			Click <em>Enter VR</em>, point the controller, pull the trigger to click.
+		</div>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.webgpu.js",
+					"three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.webgpu.js",
+					"three/tsl": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.tsl.js",
+					"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/",
+					"three-html-render/polyfill": "https://cdn.jsdelivr.net/npm/three-html-render/dist/polyfill.mjs"
+				}
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import {
+				installHtmlInCanvasPolyfill,
+				getHtmlRenderer,
+			} from 'three-html-render/polyfill';
+			import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+			import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+			import { VRButton } from 'three/addons/webxr/VRButton.js';
+			import { ARButton } from 'three/addons/webxr/ARButton.js';
+			import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+			// Force the polyfill even if native HTML-in-Canvas is available — we only use
+			// it to rasterize the DOM into a canvas, then we upload that canvas ourselves
+			// via THREE.CanvasTexture. This sidesteps three.js's HTMLTexture path which
+			// currently has color-space / upload issues on WebGL (r184).
+			installHtmlInCanvasPolyfill({ force: true });
+
+			let camera, scene, renderer, mesh, element, texture, controls;
+			const meshPosDesktopVR = new THREE.Vector3(0, 1.5, -0.8);
+			const meshPosAR = new THREE.Vector3(0, 0, -2);
+			let controller1, controller2;
+			const raycaster = new THREE.Raycaster();
+			const tempMatrix = new THREE.Matrix4();
+			const hoverState = new Map();
+
+			init();
+
+			async function init() {
+				renderer = new THREE.WebGPURenderer({ antialias: true });
+				await renderer.init();
+				renderer.toneMapping = THREE.NeutralToneMapping;
+				renderer.setPixelRatio(window.devicePixelRatio);
+				renderer.setSize(window.innerWidth, window.innerHeight);
+				renderer.xr.enabled = true;
+				renderer.xr.setReferenceSpaceType('local-floor');
+				renderer.setAnimationLoop(animate);
+				document.body.appendChild(renderer.domElement);
+
+				const xrBar = document.createElement('div');
+				xrBar.id = 'xr-enter-bar';
+				const arBtn = ARButton.createButton(renderer, {
+					optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
+				});
+				const vrBtn = VRButton.createButton(renderer);
+				// AR left, VR right (LTR). Addon inline styles are overridden by #xr-enter-bar CSS.
+				xrBar.appendChild(arBtn);
+				xrBar.appendChild(vrBtn);
+				document.body.appendChild(xrBar);
+
+				camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 2000);
+				camera.position.set(0, 1.6, 1.2);
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color(0x202030);
+				scene.environment = new THREE.PMREMGenerator(renderer).fromScene(
+					new RoomEnvironment(),
+					0.02
+				).texture;
+
+				const grid = new THREE.GridHelper(10, 20, 0x555577, 0x333344);
+				scene.add(grid);
+
+				element = createHTMLElement();
+
+				// Register the element with the polyfill: attach to the canvas (it's
+				// redirected into the polyfill's shadow host) and wait for first paint.
+				const canvas = renderer.domElement;
+				canvas.setAttribute('layoutsubtree', 'true');
+				canvas.appendChild(element);
+				await firstPaint(canvas);
+
+				const snapshot = getHtmlRenderer().getCanvas(element);
+				texture = new THREE.CanvasTexture(snapshot);
+				texture.colorSpace = THREE.SRGBColorSpace;
+				texture.anisotropy = renderer.capabilities?.getMaxAnisotropy?.() ?? 8;
+
+				// Re-upload only when the DOM actually repaints.
+				canvas.onpaint = () => {
+					texture.needsUpdate = true;
+				};
+
+				const material = new THREE.MeshStandardMaterial({
+					map: texture,
+					roughness: 0.6,
+					metalness: 0.0,
+				});
+				mesh = new THREE.Mesh(new RoundedBoxGeometry(0.4, 0.4, 0.4, 10, 0.04), material);
+				mesh.position.copy(meshPosDesktopVR);
+				scene.add(mesh);
+
+				controls = new OrbitControls(camera, renderer.domElement);
+				controls.target.copy(mesh.position);
+				controls.update();
+
+				renderer.xr.addEventListener('sessionstart', () => {
+					const isAR = renderer.xr.getSession()?.environmentBlendMode !== 'opaque';
+					if (isAR) {
+						scene.background = null;
+						mesh.position.copy(meshPosAR);
+					} else {
+						mesh.position.copy(meshPosDesktopVR);
+					}
+				});
+				renderer.xr.addEventListener('sessionend', () => {
+					scene.background = new THREE.Color(0x202030);
+					mesh.position.copy(meshPosDesktopVR);
+					controls.target.copy(mesh.position);
+					controls.update();
+				});
+
+				// No hay botón en el nuevo diseño del enlace
+
+				setupXRControllers();
+				setupDesktopPointerInteraction();
+
+				window.addEventListener('resize', onWindowResize);
+			}
+
+			function firstPaint(canvas) {
+				return new Promise((resolve) => {
+					let done = false;
+					const finish = () => {
+						if (done) return;
+						done = true;
+						canvas.onpaint = null;
+						resolve();
+					};
+					canvas.onpaint = finish;
+					canvas.requestPaint();
+					setTimeout(finish, 800);
+				});
+			}
+
+			function createHTMLElement() {
+				const el = document.createElement('div');
+				el.id = 'draw_element';
+				el.innerHTML = `
+					<a href="https://www.google.com" target="_blank">
+						<div class="google-logo">
+							<span style="color: #4285f4">G</span><span style="color: #ea4335">o</span><span style="color: #fbbc05">o</span><span style="color: #4285f4">g</span><span style="color: #34a853">l</span><span style="color: #ea4335">e</span>
+						</div>
+						<div class="visit-text">Haz clic para buscar</div>
+					</a>
+				`;
+				
+				// Evitar que los eventos sintéticos burbujeen hacia el canvas real,
+				// lo cual causaría errores en OrbitControls al no ser eventos de sistema.
+				const stop = (e) => e.stopPropagation();
+				el.addEventListener('pointerdown', stop);
+				el.addEventListener('pointerup', stop);
+				el.addEventListener('pointermove', stop);
+				el.addEventListener('click', stop);
+				
+				return el;
+			}
+
+			function setupXRControllers() {
+				const factory = new XRControllerModelFactory();
+				const laserGeom = new THREE.BufferGeometry().setFromPoints([
+					new THREE.Vector3(0, 0, 0),
+					new THREE.Vector3(0, 0, -1),
+				]);
+				const makeLaser = () => {
+					const line = new THREE.Line(
+						laserGeom,
+						new THREE.LineBasicMaterial({ color: 0x88ccff })
+					);
+					line.name = 'laser';
+					line.scale.z = 5;
+					return line;
+				};
+
+				controller1 = renderer.xr.getController(0);
+				controller2 = renderer.xr.getController(1);
+				controller1.add(makeLaser());
+				controller2.add(makeLaser());
+				scene.add(controller1, controller2);
+
+				for (const idx of [0, 1]) {
+					const grip = renderer.xr.getControllerGrip(idx);
+					grip.add(factory.createControllerModel(grip));
+					scene.add(grip);
+				}
+
+				for (const c of [controller1, controller2]) {
+					c.addEventListener('selectstart', () => onSelect(c, 'pointerdown'));
+					c.addEventListener('selectend', () => onSelect(c, 'pointerup'));
+				}
+			}
+
+			function onSelect(controller, type) {
+				const hit = intersectMesh(controller);
+				if (!hit || !hit.uv) return;
+				const { clientX, clientY, target } = uvToClient(hit.uv);
+				dispatchPointer(target, type, clientX, clientY);
+				if (type === 'pointerup') {
+					dispatchPointer(target, 'click', clientX, clientY);
+				}
+			}
+
+			function intersectMesh(controller) {
+				tempMatrix.identity().extractRotation(controller.matrixWorld);
+				raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+				raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+				return raycaster.intersectObject(mesh, false)[0] || null;
+			}
+
+			function uvToClient(uv) {
+				// El elemento #draw_element tiene un tamaño fijo de 600x600 en el CSS.
+				// Debemos usar este tamaño para el mapeo de UV, no el tamaño del canvas.
+				const w = 600;
+				const h = 600;
+				
+				const rect = element.getBoundingClientRect();
+				const x = rect.left + uv.x * w;
+				const y = rect.top + (1 - uv.y) * h;
+				
+				const target = deepestElementAt(element, x, y) || element;
+				return { clientX: x, clientY: y, target };
+			}
+
+			function deepestElementAt(root, x, y) {
+				let best = root;
+				const stack = [root];
+				while (stack.length) {
+					const node = stack.pop();
+					for (const child of node.children) {
+						const style = window.getComputedStyle(child);
+						if (style.pointerEvents === 'none' || style.display === 'none' || style.visibility === 'hidden') continue;
+
+						const r = child.getBoundingClientRect();
+						if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+							best = child;
+							stack.push(child);
+						}
+					}
+				}
+				return best;
+			}
+
+			function dispatchPointer(target, type, clientX, clientY) {
+				const event = new PointerEvent(type, {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					clientX,
+					clientY,
+					pointerId: 1, // Proporcionar un ID evita errores en listeners que lo requieran
+					pointerType: 'mouse',
+					isPrimary: true,
+					button: (type === 'click' || type === 'pointerdown' || type === 'pointerup') ? 0 : -1,
+					buttons: (type === 'pointerdown') ? 1 : 0,
+				});
+
+				target.dispatchEvent(event);
+
+				// Elements like inputs and buttons often need manual triggers for synthetic events
+				if (type === 'pointerdown') {
+					if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable) {
+						target.focus();
+					}
+				}
+
+				if (type === 'click') {
+					const clickable = target.closest('a, button, input');
+					if (clickable) {
+						clickable.click();
+					}
+				}
+			}
+
+			function updateHover(controller) {
+				const hit = intersectMesh(controller);
+				const prev = hoverState.get(controller);
+				const laser = controller.getObjectByName('laser');
+				if (!hit || !hit.uv) {
+					if (prev) {
+						dispatchPointer(prev.target, 'pointerleave', prev.x, prev.y);
+						dispatchPointer(prev.target, 'pointerout', prev.x, prev.y);
+						hoverState.delete(controller);
+					}
+					if (laser) laser.material.color.setHex(0x88ccff);
+					return;
+				}
+				const { clientX, clientY, target } = uvToClient(hit.uv);
+				if (!prev || prev.target !== target) {
+					if (prev) {
+						dispatchPointer(prev.target, 'pointerleave', prev.x, prev.y);
+						dispatchPointer(prev.target, 'pointerout', prev.x, prev.y);
+					}
+					dispatchPointer(target, 'pointerover', clientX, clientY);
+					dispatchPointer(target, 'pointerenter', clientX, clientY);
+				}
+				dispatchPointer(target, 'pointermove', clientX, clientY);
+				hoverState.set(controller, { target, x: clientX, y: clientY });
+				if (laser) laser.material.color.setHex(0x4caf50);
+			}
+
+			function setupDesktopPointerInteraction() {
+				const cast = (e) => {
+					if (renderer.xr.isPresenting) return null;
+					const ndc = new THREE.Vector2(
+						(e.clientX / window.innerWidth) * 2 - 1,
+						-(e.clientY / window.innerHeight) * 2 + 1
+					);
+					raycaster.setFromCamera(ndc, camera);
+					return raycaster.intersectObject(mesh, false)[0] || null;
+				};
+
+				let isPointerDown = false;
+				const pointerDownPos = new THREE.Vector2();
+
+				renderer.domElement.addEventListener('pointermove', (e) => {
+					const hit = cast(e);
+					if (hit && hit.uv) {
+						const { clientX, clientY, target } = uvToClient(hit.uv);
+						dispatchPointer(target, 'pointermove', clientX, clientY);
+						renderer.domElement.style.cursor = 'pointer';
+					} else {
+						renderer.domElement.style.cursor = 'auto';
+					}
+				});
+
+				renderer.domElement.addEventListener('pointerdown', (e) => {
+					const hit = cast(e);
+					if (hit && hit.uv) {
+						isPointerDown = true;
+						pointerDownPos.set(e.clientX, e.clientY);
+						const { clientX, clientY, target } = uvToClient(hit.uv);
+						dispatchPointer(target, 'pointerdown', clientX, clientY);
+					}
+				});
+
+				window.addEventListener('pointerup', (e) => {
+					if (!isPointerDown) return;
+					isPointerDown = false;
+
+					const hit = cast(e);
+					if (hit && hit.uv) {
+						const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+						if (dist < 5) { // Si es un clic (poca distancia), activamos el enlace
+							const { clientX, clientY, target } = uvToClient(hit.uv);
+							dispatchPointer(target, 'pointerup', clientX, clientY);
+							dispatchPointer(target, 'click', clientX, clientY);
+						}
+					}
+				}, true);
+
+				// Reset state if window loses focus
+				window.addEventListener('blur', () => {
+					isPointerDown = false;
+				});
+			}
+
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize(window.innerWidth, window.innerHeight);
+			}
+
+			function animate(time) {
+				if (!renderer.xr.isPresenting && mesh) {
+					mesh.rotation.x = Math.sin(time * 0.0005) * 0.2;
+					mesh.rotation.y = Math.cos(time * 0.0008) * 0.2;
+				}
+				if (renderer.xr.isPresenting) {
+					if (controller1) updateHover(controller1);
+					if (controller2) updateHover(controller2);
+				}
+				renderer.render(scene, camera);
+			}
+		</script>
+	</body>
+</html>
