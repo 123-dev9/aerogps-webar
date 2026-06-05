@@ -134,14 +134,21 @@ function switchView(viewId) {
 
   const specialDemos = document.getElementById('special-demos-view');
   const galleryTitle = document.getElementById('gallery-title');
+  const advancedDemos = document.getElementById('advanced-demos-view');
+  const advancedTitle = document.getElementById('advanced-gallery-title');
+  
   if (specialDemos) specialDemos.style.display = 'none';
   if (galleryTitle) galleryTitle.style.display = 'none';
+  if (advancedDemos) advancedDemos.style.display = 'none';
+  if (advancedTitle) advancedTitle.style.display = 'none';
 
   // Mostrar la vista objetivo
   if (viewId === 'dashboard') {
     document.getElementById('dashboard-view').style.display = 'grid';
     if (specialDemos) specialDemos.style.display = 'grid';
     if (galleryTitle) galleryTitle.style.display = 'flex';
+    if (advancedDemos) advancedDemos.style.display = 'grid';
+    if (advancedTitle) advancedTitle.style.display = 'flex';
   } else {
     const targetView = document.getElementById(`${viewId}-view`);
     if (targetView) {

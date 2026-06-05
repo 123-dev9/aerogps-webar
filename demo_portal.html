@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Portal Interdimensional WebAR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+		<style>
+			/* Capa de destello al cruzar el portal */
+			#portal-flash {
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background-color: #fff;
+				opacity: 0;
+				z-index: 99;
+				pointer-events: none;
+				transition: opacity 0.4s ease-out;
+			}
+			/* HUD en estado teleportado */
+			.portal-status-card {
+				background: rgba(10, 14, 26, 0.9);
+				border: 1.5px solid #a855f7;
+				box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+				border-radius: 20px;
+				padding: 16px;
+				position: absolute;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 90%;
+				max-width: 400px;
+				text-align: center;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+			}
+			.btn-exit-portal {
+				background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+				border: none;
+				color: white;
+				padding: 10px 20px;
+				border-radius: 12px;
+				font-weight: 700;
+				font-size: 13px;
+				cursor: pointer;
+				margin-top: 10px;
+				box-shadow: 0 4px 10px rgba(168, 85, 247, 0.3);
+				text-transform: uppercase;
+				width: 100%;
+			}
+		</style>
+	</head>
+
+	<body>
+		<!-- Destello de transición -->
+		<div id="portal-flash"></div>
+
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1" style="background: #a855f7;"></div>
+			<div class="glow-orb orb-2" style="background: #06b6d4;"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader" style="border-top-color: #a855f7;"></div>
+			<p id="loading-text">Cargando portales interdimensionales...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon" style="background: linear-gradient(135deg, #a855f7, #06b6d4);">
+					<i data-lucide="door-open" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>Portal Interdimensional</h1>
+				<p>Inmersión de Realidad Mixta</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+					Esta demo colocará una **puerta dimensional** a 3 metros de distancia en tu entorno. Al acercarte o tocarla, cruzarás el umbral a una dimensión espacial virtual en 360 grados.
+				</p>
+
+				<button class="btn btn-primary" id="btn-start" style="background: linear-gradient(135deg, #a855f7 0%, #06b6d4 100%); border: none;">
+					<i data-lucide="orbit" style="width: 18px; height: 18px;"></i>
+					INICIAR PORTAL AR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot" style="background-color: #a855f7;"></div>
+					<span id="hud-status-text">ESCANEO DE PUERTA AR</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card (Estado Real) -->
+			<div class="hud-bottom hud-interactive" id="real-world-panel">
+				<div class="section-title" style="color: #a855f7;">
+					<i data-lucide="aperture" style="width: 15px; height: 15px;"></i>
+					<span>Puerta Dimensional Detectada</span>
+				</div>
+				<p style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+					Camina físicamente hacia la puerta brillante o **tócala en tu pantalla** para cruzar el umbral hacia el otro universo.
+				</p>
+				<button class="btn btn-primary" onclick="triggerTeleport()" style="background: linear-gradient(135deg, #a855f7 0%, #06b6d4 100%); border: none; margin-top: 6px;">
+					<i data-lucide="corner-down-right" style="width: 16px; height: 16px;"></i>
+					Cruzar Puerta (Simulación)
+				</button>
+			</div>
+
+			<!-- HUD Bottom Info Card (Estado Teleportado) -->
+			<div class="portal-status-card hud-interactive" id="portal-world-panel" style="display: none;">
+				<div class="section-title" style="color: #a855f7; justify-content: center;">
+					<i data-lucide="sparkles" style="width: 15px; height: 15px;"></i>
+					<span>¡Dimensión Virtual Activada!</span>
+				</div>
+				<p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: 4px;">
+					Ahora estás dentro de la dimensión. Puedes girar en 360 grados y mirar el cielo estrellado y los objetos orbitando.
+				</p>
+				<button class="btn-exit-portal" onclick="triggerExitPortal()">
+					<i data-lucide="log-out" style="width: 14px; height: 14px; display: inline; vertical-align: middle; margin-right: 4px;"></i>
+					Regresar a la Realidad
+				</button>
+			</div>
+		</div>
+
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+			import { LoaderController } from './src/ui/loader.js';
+
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const loaderController = new LoaderController();
+
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			let insidePortal = false;
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = startPortal;
+			});
+
+			function startPortal() {
+				loaderController.show("Abriendo canal de portal AR...");
+
+				// Colocar a 3 metros de distancia en Girona
+				const centerLat = 41.296611;
+				const centerLng = 2.760382;
+				gpsService.setTarget(centerLat, centerLng);
+
+				gpsService.startTracking(
+					() => {},
+					(err) => telemetryService.logError(err, 'portalGPS')
+				);
+
+				const latOffset = 3.0 / 111111;
+				const targetLat = centerLat + latOffset;
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<!-- Elemento 3D de la Puerta (A-Frame primitives) -->
+						<a-entity id="portal-anchor" anchor-manager="lat: ${targetLat}; lng: ${centerLng}; elevation: 0;">
+							
+							<!-- El portal real (puerta neon) -->
+							<a-entity id="portal-door" class="portal-interactive" onclick="triggerTeleport()">
+								<!-- Marco de la puerta -->
+								<a-box position="0 1.2 0" width="1.8" height="2.4" depth="0.1" material="color: #a855f7; opacity: 0.2; roughness: 0.1; metalness: 0.9;"></a-box>
+								<!-- Anillo del vórtice interior -->
+								<a-ring position="0 1.2 0.05" radius-inner="0.75" radius-outer="0.8" color="#06b6d4" animation="property: rotation; to: 0 0 360; loop: true; dur: 4000; easing: linear;"></a-ring>
+								<!-- Efecto de partículas / Vórtice -->
+								<a-circle position="0 1.2 0.02" radius="0.75" material="color: #a855f7; shader: flat; opacity: 0.4;" animation="property: scale; from: 0.9 0.9 0.9; to: 1.05 1.05 1.05; loop: true; dir: alternate; dur: 1000; easing: easeInOutSine;"></a-circle>
+								<!-- Luz del portal -->
+								<a-light type="point" color="#a855f7" intensity="1.5" distance="4" position="0 1.2 0.5"></a-light>
+							</a-entity>
+
+							<!-- El entorno virtual oculto en el mundo real -->
+							<a-entity id="portal-virtual-world" visible="false">
+								<!-- Esfera celeste 360 grados -->
+								<a-sky color="#050510" radius="10" shader="flat"></a-sky>
+								<a-sphere radius="9.8" material="color: #1e1e38; wireframe: true; opacity: 0.15;"></a-sphere>
+								
+								<!-- Estrellas flotantes en la dimensión -->
+								<a-sphere position="-2 3 -4" radius="0.05" color="#fff" animation="property: scale; from: 1 1 1; to: 1.5 1.5 1.5; loop: true; dir: alternate; dur: 800;"></a-sphere>
+								<a-sphere position="3 1 -2" radius="0.04" color="#06b6d4" animation="property: scale; from: 1 1 1; to: 2 2 2; loop: true; dir: alternate; dur: 1200;"></a-sphere>
+								<a-sphere position="1 4 -3" radius="0.03" color="#a855f7" animation="property: scale; from: 1 1 1; to: 1.8 1.8 1.8; loop: true; dir: alternate; dur: 1500;"></a-sphere>
+								
+								<!-- Un objeto tridimensional girando en el espacio virtual -->
+								<a-octahedron position="0 1.5 -3" radius="0.4" color="#a855f7" animation="property: rotation; to: 360 360 0; loop: true; dur: 8000; easing: linear;">
+									<a-light type="point" color="#06b6d4" intensity="1" distance="3"></a-light>
+								</a-octahedron>
+							</a-entity>
+
+						</a-entity>
+
+						<a-camera id="cam" position="0 1.6 0" raycaster="objects: .portal-interactive" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+					</a-scene>
+				`;
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+
+					const anchor = document.getElementById('portal-anchor');
+					if (anchor) {
+						anchor.addEventListener('anchor-placed', () => loaderController.hide(), { once: true });
+					}
+					setTimeout(() => loaderController.hide(), 5000);
+
+					// Monitor de proximidad para cruzar automáticamente el portal
+					startProximityCheck();
+				}, 500);
+			}
+
+			// Verificar distancia física de la cámara al portal para teletransportarse
+			function startProximityCheck() {
+				const checkInterval = setInterval(() => {
+					if (insidePortal) return;
+
+					const cameraEl = document.getElementById('cam');
+					const portalEl = document.getElementById('portal-anchor');
+					if (!cameraEl || !portalEl) return;
+
+					const camPos = cameraEl.object3D.position;
+					const portalPos = portalEl.object3D.position;
+
+					// Distancia en el plano horizontal X-Z
+					const dist = Math.sqrt(Math.pow(camPos.x - portalPos.x, 2) + Math.pow(camPos.z - portalPos.z, 2));
+					
+					// Si el usuario se acerca a menos de 0.8 metros reales de la puerta
+					if (dist < 0.8 && portalEl.getAttribute('visible') === 'true') {
+						clearInterval(checkInterval);
+						triggerTeleport();
+					}
+				}, 500);
+			}
+
+			function triggerTeleport() {
+				if (insidePortal) return;
+				insidePortal = true;
+
+				// Efecto de destello blanco
+				const flash = document.getElementById('portal-flash');
+				flash.style.opacity = '1';
+
+				setTimeout(() => {
+					// Ocultar la puerta y activar el mundo 360 virtual
+					document.getElementById('portal-door').setAttribute('visible', 'false');
+					document.getElementById('portal-virtual-world').setAttribute('visible', 'true');
+
+					// Cambiar la UI del HUD
+					document.getElementById('real-world-panel').style.display = 'none';
+					document.getElementById('portal-world-panel').style.display = 'block';
+					document.getElementById('hud-status-text').innerText = "DIMENSIÓN ESPACIAL 360°";
+					
+					if (typeof lucide !== 'undefined') lucide.createIcons();
+
+					// Desvanecer el destello
+					flash.style.opacity = '0';
+				}, 400);
+			}
+
+			function triggerExitPortal() {
+				if (!insidePortal) return;
+				insidePortal = false;
+
+				const flash = document.getElementById('portal-flash');
+				flash.style.opacity = '1';
+
+				setTimeout(() => {
+					// Restaurar el mundo real
+					document.getElementById('portal-door').setAttribute('visible', 'true');
+					document.getElementById('portal-virtual-world').setAttribute('visible', 'false');
+
+					// Cambiar la UI del HUD de vuelta
+					document.getElementById('portal-world-panel').style.display = 'none';
+					document.getElementById('real-world-panel').style.display = 'block';
+					document.getElementById('hud-status-text').innerText = "ESCANEO DE PUERTA AR";
+
+					if (typeof lucide !== 'undefined') lucide.createIcons();
+					
+					flash.style.opacity = '0';
+
+					// Volver a iniciar el monitor
+					startProximityCheck();
+				}, 400);
+			}
+
+			// Exponer global
+			window.triggerTeleport = triggerTeleport;
+			window.triggerExitPortal = triggerExitPortal;
+		</script>
+	</body>
+</html>

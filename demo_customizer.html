@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Configurador de Producto WebAR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+		<style>
+			/* Panel de Compra / Personalización */
+			.shop-panel {
+				background: rgba(10, 14, 26, 0.85);
+				border: 1px solid var(--border-color);
+				border-radius: 24px;
+				padding: 20px;
+				position: absolute;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 92%;
+				max-width: 440px;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				display: flex;
+				flex-direction: column;
+				gap: 14px;
+				box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+			}
+			.shop-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: start;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+				padding-bottom: 10px;
+			}
+			.shop-title {
+				font-family: 'Space Grotesk', sans-serif;
+				font-size: 18px;
+				font-weight: 700;
+				color: #fff;
+			}
+			.shop-price {
+				font-family: 'Space Grotesk', sans-serif;
+				font-size: 20px;
+				font-weight: 700;
+				color: var(--accent-cyan);
+			}
+			.customizer-section {
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+			}
+			.customizer-lbl {
+				font-size: 10px;
+				text-transform: uppercase;
+				color: var(--text-muted);
+				font-weight: 700;
+				letter-spacing: 0.5px;
+			}
+			.color-row {
+				display: flex;
+				gap: 10px;
+			}
+			.color-option {
+				width: 28px;
+				height: 28px;
+				border-radius: 50%;
+				border: 2px solid transparent;
+				cursor: pointer;
+				transition: transform 0.2s;
+			}
+			.color-option.active {
+				border-color: #fff;
+				transform: scale(1.1);
+				box-shadow: 0 0 10px var(--accent-cyan-glow);
+			}
+			.material-row {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 8px;
+			}
+			.material-btn {
+				background: rgba(255, 255, 255, 0.02);
+				border: 1px solid var(--border-color);
+				color: var(--text-main);
+				border-radius: 10px;
+				padding: 8px 4px;
+				font-size: 11px;
+				font-weight: 600;
+				cursor: pointer;
+				text-align: center;
+				transition: all 0.2s;
+			}
+			.material-btn.active {
+				background: rgba(6, 182, 212, 0.1);
+				border-color: var(--accent-cyan);
+				color: var(--accent-cyan);
+			}
+		</style>
+	</head>
+
+	<body>
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1" style="background: var(--accent-cyan);"></div>
+			<div class="glow-orb orb-2" style="background: var(--primary); opacity: 0.1;"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader"></div>
+			<p id="loading-text">Cargando visualizador de producto 3D...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon">
+					<i data-lucide="shopping-bag" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>Configurador de Producto</h1>
+				<p>AR Shopping Inmersivo</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+					Esta demo colocará una **Silla de Diseño Escandinavo** a escala real en tu habitación. Podrás rotar, escalar y configurar materiales y colores interactuando con el HUD de compra.
+				</p>
+
+				<button class="btn btn-primary" id="btn-start" style="width: 100%;">
+					<i data-lucide="layout" style="width: 18px; height: 18px;"></i>
+					INICIAR CONFIGURADOR AR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot" style="background-color: var(--accent-cyan);"></div>
+					<span>CONFIGURADOR ACTIVO</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card (Tienda E-Commerce) -->
+			<div class="shop-panel hud-interactive">
+				<div class="shop-header">
+					<div>
+						<div class="shop-title">Silla Nórdica "Girona"</div>
+						<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Diseño: Studio Aero</div>
+					</div>
+					<div class="shop-price">349,00 €</div>
+				</div>
+
+				<!-- Personalizar Color de Cojín -->
+				<div class="customizer-section">
+					<span class="customizer-lbl">Color de Tapicería</span>
+					<div class="color-row">
+						<div class="color-option active" style="background-color: #06b6d4;" onclick="changeFabricColor('#06b6d4', this)"></div>
+						<div class="color-option" style="background-color: #ef4444;" onclick="changeFabricColor('#ef4444', this)"></div>
+						<div class="color-option" style="background-color: #10b981;" onclick="changeFabricColor('#10b981', this)"></div>
+						<div class="color-option" style="background-color: #eab308;" onclick="changeFabricColor('#eab308', this)"></div>
+						<div class="color-option" style="background-color: #ffffff;" onclick="changeFabricColor('#ffffff', this)"></div>
+					</div>
+				</div>
+
+				<!-- Personalizar Material de Patas -->
+				<div class="customizer-section">
+					<span class="customizer-lbl">Estructura Base</span>
+					<div class="material-row">
+						<button class="material-btn active" onclick="changeLegMaterial('wood', this)">Madera Roble</button>
+						<button class="material-btn" onclick="changeLegMaterial('chrome', this)">Acero Pulido</button>
+						<button class="material-btn" onclick="changeLegMaterial('carbon', this)">Fibra Carbono</button>
+					</div>
+				</div>
+
+				<button class="btn btn-primary" onclick="alert('¡Producto añadido al carrito virtual!')" style="margin-top: 4px; padding: 12px; font-size: 14px;">
+					<i data-lucide="shopping-cart" style="width: 16px; height: 16px;"></i>
+					Añadir al Carrito
+				</button>
+			</div>
+		</div>
+
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+			import { LoaderController } from './src/ui/loader.js';
+
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const loaderController = new LoaderController();
+
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = startCustomizer;
+			});
+
+			function startCustomizer() {
+				loaderController.show("Sincronizando coordenadas y cargando modelo...");
+
+				// Colocar a 2.8 metros de distancia en Girona
+				const centerLat = 41.296611;
+				const centerLng = 2.760382;
+				gpsService.setTarget(centerLat, centerLng);
+
+				gpsService.startTracking(
+					() => {},
+					(err) => telemetryService.logError(err, 'customizerGPS')
+				);
+
+				const latOffset = 2.8 / 111111;
+				const targetLat = centerLat + latOffset;
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<a-assets>
+							<a-asset-item id="model-chair" src="./assets/Chair.glb"></a-asset-item>
+						</a-assets>
+
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#06b6d4" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- El modelo 3D con anclaje e interacción de gestos -->
+						<a-entity
+							id="ar-entity-model"
+							gltf-model="#model-chair"
+							anchor-manager="lat: ${targetLat}; lng: ${centerLng}; elevation: 0;"
+							gesture-controls="minScale: 2; maxScale: 80;"
+							scale="15 15 15"
+							class="product-target"
+						></a-entity>
+
+						<a-camera position="0 1.6 0" raycaster="objects: .product-target" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+					</a-scene>
+				`;
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+
+					const chairEl = document.getElementById('ar-entity-model');
+					if (chairEl) {
+						chairEl.addEventListener('anchor-placed', () => loaderController.hide(), { once: true });
+					}
+					setTimeout(() => loaderController.hide(), 5000);
+				}, 500);
+			}
+
+			// Lógica para cambiar el color de la tapicería
+			function changeFabricColor(hexColor, buttonEl) {
+				// Estética del botón activo
+				document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('active'));
+				buttonEl.classList.add('active');
+
+				const el = document.getElementById('ar-entity-model');
+				const mesh = el?.getObject3D('mesh');
+				if (mesh) {
+					let changed = false;
+					mesh.traverse(node => {
+						if (node.isMesh) {
+							// Cambiar el color de los nodos que representen tela o cojín
+							const name = node.name.toLowerCase();
+							const matName = node.material.name.toLowerCase();
+							if (name.includes('cushion') || name.includes('fabric') || matName.includes('fabric') || matName.includes('cushion') || name.includes('seat')) {
+								node.material.color.set(hexColor);
+								changed = true;
+							}
+						}
+					});
+					
+					// Fallback si no coincide por nombres de nodos: cambiar el color principal
+					if (!changed) {
+						mesh.traverse(node => {
+							if (node.isMesh && !node.name.toLowerCase().includes('leg') && !node.name.toLowerCase().includes('wood') && !node.name.toLowerCase().includes('metal')) {
+								node.material.color.set(hexColor);
+							}
+						});
+					}
+				}
+			}
+
+			// Lógica para cambiar el material de la estructura
+			function changeLegMaterial(materialType, buttonEl) {
+				document.querySelectorAll('.material-btn').forEach(btn => btn.classList.remove('active'));
+				buttonEl.classList.add('active');
+
+				const el = document.getElementById('ar-entity-model');
+				const mesh = el?.getObject3D('mesh');
+				if (mesh) {
+					mesh.traverse(node => {
+						if (node.isMesh) {
+							const name = node.name.toLowerCase();
+							const matName = node.material.name.toLowerCase();
+							// Identificar nodos que forman la base / patas
+							if (name.includes('leg') || name.includes('base') || matName.includes('leg') || matName.includes('base') || name.includes('frame')) {
+								if (materialType === 'chrome') {
+									node.material.color.set('#ffffff');
+									node.material.roughness = 0.05;
+									node.material.metalness = 1.0;
+								} else if (materialType === 'carbon') {
+									node.material.color.set('#1e1e1e');
+									node.material.roughness = 0.45;
+									node.material.metalness = 0.7;
+								} else if (materialType === 'wood') {
+									node.material.color.set('#d97706'); // Roble/miel
+									node.material.roughness = 0.85;
+									node.material.metalness = 0.0;
+								}
+							}
+						}
+					});
+				}
+			}
+
+			// Exponer a global window
+			window.changeFabricColor = changeFabricColor;
+			window.changeLegMaterial = changeLegMaterial;
+		</script>
+	</body>
+</html>

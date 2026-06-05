@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Filtros de Rostro WebAR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame en modo Face Effects -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="face"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+		<style>
+			/* Panel de Control del Filtro Facial */
+			.face-control-panel {
+				background: rgba(10, 14, 26, 0.85);
+				border: 1px solid var(--border-color);
+				border-radius: 20px;
+				padding: 16px;
+				position: absolute;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 90%;
+				max-width: 400px;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+			}
+			.color-picker {
+				display: flex;
+				justify-content: space-around;
+				gap: 8px;
+				margin-top: 6px;
+			}
+			.color-dot {
+				width: 32px;
+				height: 32px;
+				border-radius: 50%;
+				border: 2px solid #fff;
+				cursor: pointer;
+				transition: transform 0.2s;
+			}
+			.color-dot:hover {
+				transform: scale(1.15);
+			}
+		</style>
+	</head>
+
+	<body>
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1" style="background: var(--accent-cyan);"></div>
+			<div class="glow-orb orb-2" style="background: #f43f5e;"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader" style="border-top-color: var(--accent-cyan);"></div>
+			<p id="loading-text">Calibrando escáner de reconocimiento facial...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon" style="background: linear-gradient(135deg, var(--accent-cyan), #f43f5e);">
+					<i data-lucide="smile" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>Filtros Faciales AR</h1>
+				<p>Tecnología 8th Wall Face Mesh</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+					Esta demo activará la **cámara delantera** de tu dispositivo para rastrear la malla tridimensional de tu rostro y aplicarte máscaras y visores holográficos interactivos.
+				</p>
+
+				<button class="btn btn-primary" id="btn-start" style="background: linear-gradient(135deg, var(--accent-cyan) 0%, #f43f5e 100%); border: none;">
+					<i data-lucide="video" style="width: 18px; height: 18px;"></i>
+					ACTIVAR CÁMARA FRONTAL
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot" style="background-color: var(--accent-cyan);"></div>
+					<span>FACE TRACKING ACTIVO</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card (Controles) -->
+			<div class="face-control-panel hud-interactive">
+				<div class="section-title" style="color: var(--accent-cyan); justify-content: center; margin-bottom: 4px;">
+					<i data-lucide="sliders" style="width: 15px; height: 15px;"></i>
+					<span>Personalizar Filtro Holográfico</span>
+				</div>
+				<p style="font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.4;">
+					Usa el selector inferior para cambiar el color de la malla facial digital de forma instantánea.
+				</p>
+
+				<!-- Selector de Colores -->
+				<div class="color-picker">
+					<div class="color-dot" style="background-color: #06b6d4;" onclick="changeMeshColor('#06b6d4')"></div>
+					<div class="color-dot" style="background-color: #f43f5e;" onclick="changeMeshColor('#f43f5e')"></div>
+					<div class="color-dot" style="background-color: #10b981;" onclick="changeMeshColor('#10b981')"></div>
+					<div class="color-dot" style="background-color: #a855f7;" onclick="changeMeshColor('#a855f7')"></div>
+					<div class="color-dot" style="background-color: #39ff14;" onclick="changeMeshColor('#39ff14')"></div>
+				</div>
+
+				<div class="hud-status-bar" style="border: none; padding-top: 6px; font-size: 10px; justify-content: center;">
+					<span>Anclaje: Frente y Puente de la Nariz</span>
+				</div>
+			</div>
+		</div>
+
+		<script type="module">
+			import { LoaderController } from './src/ui/loader.js';
+			const loaderController = new LoaderController();
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = startFaceTracking;
+			});
+
+			function startFaceTracking() {
+				loaderController.show("Iniciando sensores de cámara frontal...");
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<!-- xrface activa el reconocimiento facial de 8th Wall -->
+					<a-scene
+						xrface
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<a-assets>
+							<!-- Cargar algún modelo opcional si deseas, usaremos figuras geométricas para máxima estabilidad de prueba -->
+						</a-assets>
+
+						<!-- Cámara en modo Face -->
+						<a-camera
+							id="face-cam"
+							look-controls="enabled: false"
+							wasd-controls="enabled: false"
+							xrface-camera
+						></a-camera>
+
+						<!-- El Face Mesh: Se dibuja sobre toda la cara del usuario -->
+						<a-entity
+							id="face-mesh"
+							xrface-mesh
+							material="color: #06b6d4; wireframe: true; opacity: 0.5; roughness: 0.1;"
+						></a-entity>
+
+						<!-- Gafas / Visor en el puente de la nariz -->
+						<a-entity xrface-anchor="point: noseBridge">
+							<!-- Visera circular futurista -->
+							<a-torus
+								radius="0.08"
+								tube="0.008"
+								color="#06b6d4"
+								rotation="0 0 90"
+								position="0 0.02 0.05"
+								material="emissive: #06b6d4; emissiveIntensity: 0.5;"
+								animation="property: rotation; to: 360 0 90; loop: true; dur: 3000; easing: linear;"
+							></a-torus>
+							<!-- Gafas laterales -->
+							<a-box position="-0.06 0.02 0.03" width="0.04" height="0.01" depth="0.01" color="#06b6d4"></a-box>
+							<a-box position="0.06 0.02 0.03" width="0.04" height="0.01" depth="0.01" color="#06b6d4"></a-box>
+						</a-entity>
+
+						<!-- Joya flotante / Corona en la frente -->
+						<a-entity xrface-anchor="point: forehead">
+							<!-- Pirámide flotante rotando -->
+							<a-cone
+								radius-bottom="0.03"
+								height="0.08"
+								position="0 0.06 0.05"
+								color="#f43f5e"
+								material="roughness: 0.1; metalness: 0.9; emissive: #f43f5e; emissiveIntensity: 0.3;"
+								animation="property: rotation; to: 0 360 0; loop: true; dur: 2000; easing: linear;"
+							></a-cone>
+							<!-- Anillo exterior corona -->
+							<a-ring
+								radius-inner="0.04"
+								radius-outer="0.045"
+								position="0 0.06 0.05"
+								rotation="90 0 0"
+								color="#a855f7"
+							></a-ring>
+						</a-entity>
+
+					</a-scene>
+				`;
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+
+					// Ocultar cargador en cuanto la cámara esté lista
+					const mesh = document.getElementById('face-mesh');
+					if (mesh) {
+						mesh.addEventListener('model-loaded', () => loaderController.hide(), { once: true });
+					}
+					setTimeout(() => loaderController.hide(), 4000);
+				}, 500);
+			}
+
+			function changeMeshColor(colorCode) {
+				const mesh = document.getElementById('face-mesh');
+				if (mesh) {
+					mesh.setAttribute('material', 'color', colorCode);
+					console.log(`[FaceFilter] Color de malla facial modificado a: ${colorCode}`);
+				}
+			}
+
+			// Exponer global
+			window.changeMeshColor = changeMeshColor;
+		</script>
+	</body>
+</html>

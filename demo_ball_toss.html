@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Lanzamiento de Pokéballs AR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+		<style>
+			/* Panel de Puntuación del Juego */
+			.game-hud-panel {
+				background: rgba(10, 14, 26, 0.85);
+				border: 1.5px solid #ef4444;
+				box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+				border-radius: 20px;
+				padding: 16px;
+				position: absolute;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 90%;
+				max-width: 400px;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				text-align: center;
+			}
+			.game-stats {
+				display: flex;
+				justify-content: space-around;
+				align-items: center;
+			}
+			.score-lbl {
+				font-size: 10px;
+				text-transform: uppercase;
+				color: var(--text-muted);
+				font-weight: 700;
+			}
+			.score-val {
+				font-family: 'Space Grotesk', sans-serif;
+				font-size: 24px;
+				font-weight: 800;
+				color: #ef4444;
+			}
+			.game-crosshair {
+				position: fixed;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				width: 30px;
+				height: 30px;
+				border: 2px solid rgba(239, 68, 68, 0.5);
+				border-radius: 50%;
+				pointer-events: none;
+				z-index: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.game-crosshair::before {
+				content: '';
+				width: 4px;
+				height: 4px;
+				background-color: #ef4444;
+				border-radius: 50%;
+			}
+		</style>
+	</head>
+
+	<body>
+		<!-- Retículo central para apuntar -->
+		<div class="game-crosshair"></div>
+
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1" style="background: #ef4444; opacity: 0.1;"></div>
+			<div class="glow-orb orb-2" style="background: #eab308; opacity: 0.15;"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader" style="border-top-color: #ef4444;"></div>
+			<p id="loading-text">Cargando el campo de tiro Pokémon...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon" style="background: linear-gradient(135deg, #ef4444, #eab308); box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);">
+					<i data-lucide="crosshair" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>Safari Toss AR</h1>
+				<p>Juego de Físicas y Lanzamiento</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+					Inicia el minijuego. Spawnea a Meowth en el suelo. Apunta y **toca la pantalla** para disparar Pokéballs físicas. ¡Consigue golpear a Meowth para ganar puntos!
+				</p>
+				
+				<div style="background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(239,68,68,0.3); border-radius: 12px; padding: 12px; text-align: left; margin-bottom: 16px; font-size: 11px; line-height: 1.4; color: var(--text-muted);">
+					☄️ <b>Simulador de Gravedad:</b> Euler-Integration en tiempo real.<br>
+					💥 <b>Detección de Colisión:</b> Impactos y rebotes interactivos.
+				</div>
+
+				<button class="btn btn-primary btn-attack" id="btn-start" style="width: 100%;">
+					<i data-lucide="play" style="width: 18px; height: 18px;"></i>
+					INICIAR JUEGO AR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot" style="background-color: #ef4444;"></div>
+					<span>SAFARI COMBAT AR</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card (Juego) -->
+			<div class="game-hud-panel hud-interactive">
+				<div class="game-stats">
+					<div>
+						<div class="score-lbl">PUNTUACIÓN</div>
+						<div class="score-val" id="hud-score">00</div>
+					</div>
+					<div style="border-left: 1px solid rgba(255,255,255,0.05); height: 36px;"></div>
+					<div>
+						<div class="score-lbl">LANZAMIENTOS</div>
+						<div class="score-val" id="hud-shots" style="color: #eab308;">0</div>
+					</div>
+				</div>
+				<div style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top: 4px;">
+					Apunta con la retícula central y **toca la pantalla** para disparar.<br>
+					<span style="color: #ef4444; font-weight: 600;">¡Meowth saltará y protestará al ser golpeado!</span>
+				</div>
+			</div>
+		</div>
+
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+			import { LoaderController } from './src/ui/loader.js';
+
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const loaderController = new LoaderController();
+
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			let score = 0;
+			let shots = 0;
+			let activeProjectiles = [];
+
+			// Registrar componente de físicas e impacto en la escena A-Frame
+			if (!AFRAME.components['toss-physics']) {
+				AFRAME.registerComponent('toss-physics', {
+					init: function() {
+						this.projectiles = [];
+						// Escuchar clicks/taps en la pantalla
+						window.addEventListener('click', (e) => {
+							// Evitar disparar si se hace click en botones del HUD
+							if (e.target.closest('.hud-interactive')) return;
+							this.shootBall();
+						});
+					},
+					shootBall: function() {
+						const cameraEl = document.getElementById('cam');
+						if (!cameraEl) return;
+
+						// Incrementar disparos
+						shots++;
+						document.getElementById('hud-shots').innerText = shots;
+
+						// Posición y orientación de la cámara
+						const camPos = cameraEl.object3D.position;
+						
+						// Obtener el vector de dirección hacia adelante de la cámara
+						const direction = new THREE.Vector3();
+						cameraEl.object3D.getWorldDirection(direction);
+						// getWorldDirection en Three.js apunta hacia atrás, invertimos
+						direction.multiplyScalar(-1);
+
+						// Crear la entidad visual de la Pokéball
+						const ball = document.createElement('a-entity');
+						ball.setAttribute('position', `${camPos.x} ${camPos.y - 0.2} ${camPos.z}`);
+						
+						// Diseño visual básico de Pokéball usando dos semiesferas
+						ball.innerHTML = `
+							<a-sphere radius="0.08" color="#fff"></a-sphere>
+							<a-sphere radius="0.08" color="#ef4444" theta-length="90" rotation="90 0 0"></a-sphere>
+							<a-ring radius-inner="0.08" radius-outer="0.082" color="#000" rotation="90 0 0" position="0 0 0"></a-ring>
+						`;
+
+						this.el.appendChild(ball);
+
+						// Añadir al array de proyectiles con velocidad inicial
+						const speed = 12; // m/s
+						this.projectiles.push({
+							el: ball,
+							position: new THREE.Vector3(camPos.x, camPos.y - 0.2, camPos.z),
+							velocity: direction.clone().multiplyScalar(speed),
+							gravity: -9.8, // aceleración gravedad m/s^2
+							lifeTime: 0
+						});
+
+						// Sonido de disparo (Web Audio API)
+						playSynthSound(440, 150, 0.15, 'triangle');
+					},
+					tick: function(time, timeDelta) {
+						if (this.projectiles.length === 0) return;
+
+						const dt = timeDelta / 1000; // segundos
+						const targetEl = document.getElementById('entity-target');
+						if (!targetEl) return;
+
+						const targetPos = targetEl.object3D.position;
+
+						for (let i = this.projectiles.length - 1; i >= 0; i--) {
+							const p = this.projectiles[i];
+							p.lifeTime += dt;
+
+							// 1. Integración de Euler para movimiento y gravedad
+							p.velocity.y += p.gravity * dt;
+							p.position.addScaledVector(p.velocity, dt);
+
+							// Actualizar posición en A-Frame
+							p.el.setAttribute('position', p.position);
+
+							// 2. Comprobar colisión con Meowth
+							const dist = p.position.distanceTo(targetPos);
+							if (dist < 0.6) {
+								this.triggerHit(p.el, targetEl);
+								this.projectiles.splice(i, 1);
+								continue;
+							}
+
+							// 3. Comprobar colisión con el suelo (y = 0)
+							if (p.position.y <= -0.1) {
+								// Rebote simple
+								if (p.velocity.y < -1) {
+									p.position.y = 0;
+									p.velocity.y = -p.velocity.y * 0.4; // pérdida de energía 60%
+									p.velocity.x *= 0.6;
+									p.velocity.z *= 0.6;
+								} else {
+									// Destruir al detenerse
+									p.el.remove();
+									this.projectiles.splice(i, 1);
+								}
+							}
+
+							// 4. Limitar vida del proyectil (5 segundos)
+							if (p.lifeTime > 5) {
+								p.el.remove();
+								this.projectiles.splice(i, 1);
+							}
+						}
+					},
+					triggerHit: function(ballEl, targetEl) {
+						// Animación del destello
+						ballEl.remove();
+
+						// Incrementar puntuación
+						score += 10;
+						document.getElementById('hud-score').innerText = score >= 100 ? score : `0${score}`;
+
+						// Sonido de explosión sintetizado
+						playSynthSound(150, 800, 0.35, 'sawtooth');
+
+						// Activar reacción animada en Meowth (hacerle saltar)
+						targetEl.setAttribute('animation-mixer', {
+							clip: 'Jump', // O cualquier clip que empiece con J
+							loop: 'once',
+							clampWhenFinished: true
+						});
+
+						// Revertir a la animación idle por defecto
+						const onFinished = () => {
+							targetEl.setAttribute('animation-mixer', {
+								clip: '*',
+								loop: 'repeat'
+							});
+							targetEl.removeEventListener('animation-finished', onFinished);
+						};
+						targetEl.addEventListener('animation-finished', onFinished);
+
+						// Generar partículas de impacto
+						this.spawnSplash(targetEl.object3D.position);
+					},
+					spawnSplash: function(pos) {
+						// Crear 8 pequeñas esferas de colores saliendo despedidas
+						for (let i = 0; i < 8; i++) {
+							const p = document.createElement('a-sphere');
+							p.setAttribute('radius', '0.03');
+							p.setAttribute('color', i % 2 === 0 ? '#ef4444' : '#eab308');
+							p.setAttribute('position', `${pos.x} ${pos.y + 0.3} ${pos.z}`);
+
+							// Fuerza aleatoria en todas direcciones
+							const theta = Math.random() * Math.PI * 2;
+							const phi = Math.acos((Math.random() * 2) - 1);
+							const speed = 3 + Math.random() * 2;
+
+							const vx = speed * Math.sin(phi) * Math.cos(theta);
+							const vy = speed * Math.sin(phi) * Math.sin(theta) + 2; // impulso hacia arriba
+							const vz = speed * Math.cos(phi);
+
+							this.el.appendChild(p);
+
+							// Animación A-Frame para simular la dispersión
+							p.setAttribute('animation__pos', {
+								property: 'position',
+								to: `${pos.x + vx} ${Math.max(0, pos.y + vy - 2)} ${pos.z + vz}`,
+								dur: 800,
+								easing: 'easeOutQuad'
+							});
+							p.setAttribute('animation__scale', {
+								property: 'scale',
+								to: '0 0 0',
+								dur: 800,
+								easing: 'easeOutQuad'
+							});
+
+							// Eliminar después de finalizar
+							setTimeout(() => p.remove(), 800);
+						}
+					}
+				});
+			}
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = startGame;
+			});
+
+			function startGame() {
+				loaderController.show("Instalando campo de entrenamiento AR...");
+
+				// Invocación a 3.5 metros al norte
+				const centerLat = 41.296611;
+				const centerLng = 2.760382;
+				gpsService.setTarget(centerLat, centerLng);
+
+				gpsService.startTracking(
+					() => {},
+					(err) => telemetryService.logError(err, 'gameGPS')
+				);
+
+				const latOffset = 3.5 / 111111;
+				const targetLat = centerLat + latOffset;
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+						toss-physics
+					>
+						<a-assets>
+							<a-asset-item id="model-meowth" src="./assets/pokemon_3ds_meowth.glb"></a-asset-item>
+						</a-assets>
+
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#ef4444" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- El Objetivo: Meowth Animado -->
+						<a-entity
+							id="entity-target"
+							gltf-model="#model-meowth"
+							anchor-manager="lat: ${targetLat}; lng: ${centerLng}; elevation: 0;"
+							scale="0.5 0.5 0.5"
+							animation-mixer="clip: *; loop: repeat"
+							class="target-entity"
+						>
+							<a-text value="Objetivo: Meowth" position="0 1.2 0" align="center" color="#ef4444" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<a-camera id="cam" position="0 1.6 0"></a-camera>
+					</a-scene>
+				`;
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+
+					const target = document.getElementById('entity-target');
+					if (target) {
+						target.addEventListener('anchor-placed', () => loaderController.hide(), { once: true });
+					}
+					setTimeout(() => loaderController.hide(), 5000);
+				}, 500);
+			}
+
+			// Sintetizador de sonido genérico Web Audio API
+			function playSynthSound(startFreq, endFreq, duration, type = 'sine') {
+				if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+					try {
+						const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+						const osc = audioCtx.createOscillator();
+						const gain = audioCtx.createGain();
+
+						osc.type = type;
+						osc.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
+						osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + duration);
+
+						gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+						gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+						osc.connect(gain);
+						gain.connect(audioCtx.destination);
+
+						osc.start();
+						osc.stop(audioCtx.currentTime + duration);
+					} catch(err) {
+						console.warn(err);
+					}
+				}
+			}
+		</script>
+	</body>
+</html>
