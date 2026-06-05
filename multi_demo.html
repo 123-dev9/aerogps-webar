@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Multi-Objeto WebAR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+
+		<!-- Estilos Compartidos -->
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+		
+		<!-- A-Frame Extras para reproducir animaciones -->
+		<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+	</head>
+
+	<body>
+		<!-- Glows de Fondo -->
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1"></div>
+			<div class="glow-orb orb-2"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader"></div>
+			<p id="loading-text">Cargando múltiples modelos espaciales...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon">
+					<i data-lucide="layers" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>AeroGPS Multiverso</h1>
+				<p>Escena Multi-Objeto AR</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<div>
+					<div class="section-title" style="justify-content: center; margin-bottom: 14px;">
+						<i data-lucide="info" style="width: 16px; height: 16px;"></i>
+						<span>Distribución de Objetos (Espacio de 5m)</span>
+					</div>
+					
+					<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+						Esta demostración cargará **4 modelos animados simultáneamente** en una cuadrícula con 5 metros de separación real entre ellos:
+					</p>
+
+					<!-- Detalle de la cuadrícula -->
+					<div style="display: grid; grid-template-columns: 1fr; gap: 8px; text-align: left; margin-bottom: 14px;">
+						<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
+							<span style="font-size: 18px;">🐉</span>
+							<div>
+								<div style="font-size: 12px; font-weight: 600; color: #fff;">Dragón (Centro)</div>
+								<div style="font-size: 10px; color: var(--text-muted);">Ubicación central: 41.296611, 2.760382</div>
+							</div>
+						</div>
+						<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
+							<span style="font-size: 18px;">🎡</span>
+							<div>
+								<div style="font-size: 12px; font-weight: 600; color: #fff;">Noria (5m al Norte)</div>
+								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296656, 2.760382</div>
+							</div>
+						</div>
+						<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
+							<span style="font-size: 18px;">🦇</span>
+							<div>
+								<div style="font-size: 12px; font-weight: 600; color: #fff;">Murciélago (5m al Este)</div>
+								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296611, 2.760442</div>
+							</div>
+						</div>
+						<div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
+							<span style="font-size: 18px;">🤖</span>
+							<div>
+								<div style="font-size: 12px; font-weight: 600; color: #fff;">Robot (5m al Oeste)</div>
+								<div style="font-size: 10px; color: var(--text-muted);">Ubicación: 41.296611, 2.760322</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<button class="btn btn-primary" id="btn-start-multi" style="width: 100%;">
+					<i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+					INICIAR ESCENA MULTI-AR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" id="btn-back-multi">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot"></div>
+					<span>MULTI-AR ACTIVA</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card (Muestra telemetría general y ubicación central) -->
+			<div class="hud-bottom hud-interactive">
+				<div class="hud-info-grid">
+					<div class="hud-stat">
+						<span class="hud-stat-label">Escena</span>
+						<span class="hud-stat-val">Multiverso 3D (4 Objetos)</span>
+					</div>
+					<div class="hud-stat" style="text-align: right;">
+						<span class="hud-stat-label">Precisión GPS</span>
+						<span class="hud-stat-val" id="gps-accuracy-text">Sincronizando...</span>
+					</div>
+				</div>
+				
+				<div class="hud-status-bar" style="border: none; padding-top: 0;">
+					<span id="device-heading-text">Sensor: --</span>
+					<span style="color: var(--accent-cyan);">Pellizca cada objeto para escalarlo/rotarlo</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- Lógica de Multi-Objeto -->
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { AssetService } from './src/services/assets.js';
+			
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+
+			import { LoaderController } from './src/ui/loader.js';
+			import { TutorialController } from './src/ui/tutorial.js';
+
+			// Coordenadas fijas central
+			const CENTER_LAT = 41.296611;
+			const CENTER_LNG = 2.760382;
+
+			// Instanciar servicios
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const assetService = new AssetService();
+
+			// Registrar componentes
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			// UI
+			const loaderController = new LoaderController();
+			const tutorialController = new TutorialController();
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+
+				const startBtn = document.getElementById('btn-start-multi');
+				startBtn.onclick = startMultiScene;
+
+				const backBtn = document.getElementById('btn-back-multi');
+				backBtn.onclick = stopMultiScene;
+			});
+
+			function startMultiScene() {
+				// Fijar coordenadas de la escena central en el servicio de GPS
+				gpsService.setTarget(CENTER_LAT, CENTER_LNG);
+
+				// Mostrar cargador
+				loaderController.show("Iniciando cámara y cargando múltiples modelos 3D...");
+
+				gpsService.startTracking(
+					(coords) => {
+						const accuracy = coords.accuracy.toFixed(1);
+						document.getElementById('gps-accuracy-text').innerText = `±${accuracy}m`;
+					},
+					(err) => {
+						telemetryService.logError(err, 'multiGPS');
+					}
+				);
+
+				// Orientación
+				if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+					DeviceOrientationEvent.requestPermission()
+						.then(state => {
+							if (state === 'granted') {
+								window.addEventListener('deviceorientation', handleOrientation, true);
+							}
+						}).catch(console.error);
+				} else {
+					window.addEventListener('deviceorientation', handleOrientation, true);
+				}
+
+				// Crear escena A-Frame dinámicamente con 4 objetos colocados
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<a-assets>
+							<a-asset-item id="model-dragon" src="./assets/Dragon.glb"></a-asset-item>
+							<a-asset-item id="model-ferris" src="./assets/FerrisWheel.glb"></a-asset-item>
+							<a-asset-item id="model-bat" src="./assets/Bat.glb"></a-asset-item>
+							<a-asset-item id="model-sweeper" src="./assets/Sweeper.glb"></a-asset-item>
+						</a-assets>
+
+						<!-- Indicador de detección de suelo -->
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#06b6d4" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- OBJETO 1: Dragón (Coordenada Central) -->
+						<a-entity
+							id="entity-dragon"
+							gltf-model="#model-dragon"
+							anchor-manager="lat: 41.296611; lng: 2.760382; elevation: 0.5;"
+							gesture-controls="minScale: 1; maxScale: 80;"
+							scale="10 10 10"
+							animation-mixer
+						>
+							<a-text value="Dragon Volador" position="0 2.2 0" align="center" color="#06b6d4" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<!-- OBJETO 2: Noria (5m al Norte de la Central) -->
+						<a-entity
+							id="entity-ferris"
+							gltf-model="#model-ferris"
+							anchor-manager="lat: 41.296656; lng: 2.760382; elevation: 0;"
+							gesture-controls="minScale: 0.5; maxScale: 40;"
+							scale="3 3 3"
+							animation-mixer
+						>
+							<a-text value="Noria Gigante (+5m Norte)" position="0 3.2 0" align="center" color="#10b981" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<!-- OBJETO 3: Murciélago (5m al Este de la Central) -->
+						<a-entity
+							id="entity-bat"
+							gltf-model="#model-bat"
+							anchor-manager="lat: 41.296611; lng: 2.760442; elevation: 1.5;"
+							gesture-controls="minScale: 2; maxScale: 100;"
+							scale="12 12 12"
+							animation-mixer
+						>
+							<a-text value="Murcielago (+5m Este)" position="0 1.2 0" align="center" color="#f43f5e" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<!-- OBJETO 4: Robot Barredor (5m al Oeste de la Central) -->
+						<a-entity
+							id="entity-sweeper"
+							gltf-model="#model-sweeper"
+							anchor-manager="lat: 41.296611; lng: 2.760322; elevation: 0;"
+							gesture-controls="minScale: 2; maxScale: 80;"
+							scale="12 12 12"
+							animation-mixer
+						>
+							<a-text value="Robot Barredor (+5m Oeste)" position="0 1.5 0" align="center" color="#a855f7" width="4" wrap-count="15"></a-text>
+						</a-entity>
+
+						<a-camera position="0 1.6 0" raycaster="objects: #entity-dragon, #entity-ferris, #entity-bat, #entity-sweeper" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+					</a-scene>
+				`;
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+
+					tutorialController.show();
+
+					// Ocultar cargador en cuanto el primer elemento se fije
+					const firstEntity = document.getElementById('entity-dragon');
+					if (firstEntity) {
+						firstEntity.addEventListener('anchor-placed', () => {
+							loaderController.hide();
+						}, { once: true });
+					}
+
+					setTimeout(() => {
+						loaderController.hide();
+					}, 5000);
+				}, 500);
+			}
+
+			function handleOrientation(e) {
+				let heading = e.webkitCompassHeading;
+				if (heading === undefined) heading = 360 - e.alpha;
+				if (heading !== undefined && heading !== null && !isNaN(heading)) {
+					document.getElementById('device-heading-text').innerText = `Sensor: ${Math.round(heading)}°`;
+				}
+			}
+
+			function stopMultiScene() {
+				loaderController.show("Cerrando sensores...");
+				gpsService.stopTracking();
+				window.removeEventListener('deviceorientation', handleOrientation, true);
+
+				tutorialController.hide();
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.style.display = 'none';
+				sceneContainer.innerHTML = '';
+
+				document.querySelectorAll('video').forEach(v => {
+					if (v.srcObject) {
+						v.srcObject.getTracks().forEach(track => track.stop());
+					}
+					v.remove();
+				});
+
+				document.getElementById('ar-hud').style.display = 'none';
+				document.getElementById('config-screen').style.display = 'flex';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.opacity = '1';
+					loaderController.hide();
+				}, 100);
+			}
+		</script>
+	</body>
+</html>
