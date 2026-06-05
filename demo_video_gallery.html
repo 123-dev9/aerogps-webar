@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Cine y Galería AR</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+		<style>
+			/* Panel de Control de Cine y Galería */
+			.gallery-control-panel {
+				background: rgba(10, 14, 26, 0.85);
+				border: 1px solid var(--border-color);
+				border-radius: 24px;
+				padding: 18px;
+				position: absolute;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 92%;
+				max-width: 440px;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+				box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+			}
+			.gallery-row {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				gap: 10px;
+			}
+			.btn-action-video {
+				flex: 1;
+				background: rgba(255, 255, 255, 0.05);
+				border: 1px solid var(--border-color);
+				color: var(--text-main);
+				padding: 10px;
+				border-radius: 12px;
+				font-size: 12px;
+				font-weight: 700;
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 6px;
+				transition: all 0.2s;
+			}
+			.btn-action-video:hover {
+				background: rgba(6, 182, 212, 0.1);
+				border-color: var(--accent-cyan);
+				color: var(--accent-cyan);
+			}
+			.video-slider-group {
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+				border-top: 1px solid rgba(255,255,255,0.05);
+				padding-top: 10px;
+			}
+			.desc-bubble {
+				background: rgba(6, 182, 212, 0.08);
+				border: 1px dashed var(--accent-cyan);
+				border-radius: 12px;
+				padding: 10px 14px;
+				font-size: 12px;
+				line-height: 1.4;
+				color: var(--text-main);
+				text-align: center;
+				min-height: 38px;
+			}
+		</style>
+	</head>
+
+	<body>
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1" style="background: var(--accent-cyan);"></div>
+			<div class="glow-orb orb-2" style="background: var(--primary); opacity: 0.15;"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader"></div>
+			<p id="loading-text">Cargando reproductor de video espacial...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px; margin-bottom: 20px;">
+				<div class="logo-icon">
+					<i data-lucide="video" style="color: white; width: 28px; height: 28px;"></i>
+				</div>
+				<h1>Cine y Galería de Arte</h1>
+				<p>Cine Flotante y Cuadros 3D</p>
+			</div>
+
+			<div class="panel" style="max-width: 440px; text-align: center;">
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+					Esta demo proyectará una **pantalla de cine de 3 metros** que reproduce un video de muestra y **dos cuadros flotantes** con fotografías de Girona. Puedes tocar los cuadros para ver información histórica.
+				</p>
+
+				<button class="btn btn-primary" id="btn-start" style="width: 100%;">
+					<i data-lucide="play-circle" style="width: 18px; height: 18px;"></i>
+					INICIAR PANTALLA AR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" onclick="location.href='index.html'">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot" style="background-color: var(--accent-cyan);"></div>
+					<span>CINE ESPACIAL ACTIVO</span>
+				</div>
+			</div>
+
+			<!-- HUD Bottom Info Card (Controles de Cine) -->
+			<div class="gallery-control-panel hud-interactive">
+				<!-- Descripción del Cuadro Clicado -->
+				<div class="desc-bubble" id="gallery-desc-text">
+					Toca los cuadros flotantes a los lados de la pantalla para conocer más detalles sobre Girona.
+				</div>
+
+				<!-- Controles de Video -->
+				<div class="gallery-row">
+					<button class="btn-action-video" onclick="togglePlay()" id="btn-play">
+						<i data-lucide="play" id="play-icon" style="width: 15px; height: 15px;"></i>
+						<span id="play-btn-lbl">Reproducir</span>
+					</button>
+					<button class="btn-action-video" onclick="toggleMute()" id="btn-mute">
+						<i data-lucide="volume-x" id="mute-icon" style="width: 15px; height: 15px;"></i>
+						<span id="mute-btn-lbl">Activar Sonido</span>
+					</button>
+				</div>
+
+				<!-- Regulador de Tamaño de Pantalla -->
+				<div class="video-slider-group">
+					<div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-weight: 600;">
+						<span>Escala de Pantalla</span>
+						<span id="size-val-display" style="color: var(--accent-cyan);">1.0x</span>
+					</div>
+					<input type="range" min="0.5" max="2.0" step="0.1" value="1.0" class="slider-control" oninput="changeSize(this.value)" />
+				</div>
+			</div>
+		</div>
+
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+			import { LoaderController } from './src/ui/loader.js';
+
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const loaderController = new LoaderController();
+
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			const imgDescriptions = {
+				img1: "Catedral de Girona: Majestuoso templo con la nave gótica más ancha del mundo.",
+				img2: "Pont de les Peixateries Velles: Famoso puente de estructura de hierro roja diseñado por Gustave Eiffel."
+			};
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+				document.getElementById('btn-start').onclick = startGallery;
+			});
+
+			function startGallery() {
+				loaderController.show("Cargando texturas de video y cuadros...");
+
+				// Iniciar a 3.5 metros al norte en Girona
+				const centerLat = 41.296611;
+				const centerLng = 2.760382;
+				gpsService.setTarget(centerLat, centerLng);
+
+				gpsService.startTracking(
+					() => {},
+					(err) => telemetryService.logError(err, 'galleryGPS')
+				);
+
+				const latOffset = 3.5 / 111111;
+				const targetLat = centerLat + latOffset;
+
+				// Distribuir cuadros laterales
+				const lngOffset = 1.6 / (111111 * Math.cos(centerLat * Math.PI / 180));
+				const leftLat = targetLat - (0.5/111111);
+				const leftLng = centerLng - lngOffset;
+				const rightLat = targetLat - (0.5/111111);
+				const rightLng = centerLng + lngOffset;
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<a-assets>
+							<!-- Video con CORS habilitado -->
+							<video
+								id="ar-video"
+								src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
+								loop="true"
+								crossorigin="anonymous"
+								playsinline
+								webkit-playsinline
+							></video>
+						</a-assets>
+
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#06b6d4" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- El Cine Central -->
+						<a-entity id="video-anchor" anchor-manager="lat: ${targetLat}; lng: ${centerLng}; elevation: 1.5;">
+							<a-video
+								id="ar-video-screen"
+								src="#ar-video"
+								width="2.4"
+								height="1.35"
+								class="video-target"
+								material="shader: flat;"
+							></a-video>
+							
+							<!-- Marco de la pantalla -->
+							<a-box position="0 0 -0.05" width="2.5" height="1.45" depth="0.05" color="#0a0e1a"></a-box>
+						</a-entity>
+
+						<!-- Cuadro Flotante Izquierdo (Catedral) -->
+						<a-entity
+							id="entity-img1"
+							anchor-manager="lat: ${leftLat}; lng: ${leftLng}; elevation: 1.4;"
+							class="gallery-item-target"
+							onclick="zoomImage('img1')"
+						>
+							<a-image
+								src="https://images.unsplash.com/photo-1548678665-27a195d2c676?w=600"
+								width="0.8"
+								height="0.6"
+								rotation="0 25 0"
+							></a-image>
+							<a-text value="Catedral" position="-0.4 -0.4 0.1" rotation="0 25 0" align="left" color="#06b6d4" width="2.5"></a-text>
+						</a-entity>
+
+						<!-- Cuadro Flotante Derecho (Puente Eiffel) -->
+						<a-entity
+							id="entity-img2"
+							anchor-manager="lat: ${rightLat}; lng: ${rightLng}; elevation: 1.4;"
+							class="gallery-item-target"
+							onclick="zoomImage('img2')"
+						>
+							<a-image
+								src="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=600"
+								width="0.8"
+								height="0.6"
+								rotation="0 -25 0"
+							></a-image>
+							<a-text value="Puente Eiffel" position="-0.4 -0.4 0.1" rotation="0 -25 0" align="left" color="#06b6d4" width="2.5"></a-text>
+						</a-entity>
+
+						<a-camera position="0 1.6 0" raycaster="objects: .gallery-item-target, .video-target" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+					</a-scene>
+				`;
+
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+					document.getElementById('ar-hud').style.display = 'flex';
+
+					const videoAnchor = document.getElementById('video-anchor');
+					if (videoAnchor) {
+						videoAnchor.addEventListener('anchor-placed', () => {
+							loaderController.hide();
+							// Iniciar el video silenciado por defecto para asegurar autoplay en navegadores
+							const video = document.getElementById('ar-video');
+							if (video) {
+								video.muted = true;
+								video.play();
+								document.getElementById('play-btn-lbl').innerText = "Pausar";
+								document.getElementById('play-icon').setAttribute('data-lucide', 'pause');
+								if (typeof lucide !== 'undefined') lucide.createIcons();
+							}
+						}, { once: true });
+					}
+					setTimeout(() => loaderController.hide(), 5000);
+				}, 500);
+			}
+
+			function togglePlay() {
+				const video = document.getElementById('ar-video');
+				if (!video) return;
+
+				if (video.paused) {
+					video.play();
+					document.getElementById('play-btn-lbl').innerText = "Pausar";
+					document.getElementById('play-icon').setAttribute('data-lucide', 'pause');
+				} else {
+					video.pause();
+					document.getElementById('play-btn-lbl').innerText = "Reproducir";
+					document.getElementById('play-icon').setAttribute('data-lucide', 'play');
+				}
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+			}
+
+			function toggleMute() {
+				const video = document.getElementById('ar-video');
+				if (!video) return;
+
+				video.muted = !video.muted;
+				const isMuted = video.muted;
+
+				document.getElementById('mute-btn-lbl').innerText = isMuted ? "Activar Sonido" : "Silenciar";
+				document.getElementById('mute-icon').setAttribute('data-lucide', isMuted ? 'volume-x' : 'volume-2');
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+			}
+
+			function changeSize(val) {
+				const scale = parseFloat(val);
+				const videoEl = document.getElementById('ar-video-screen');
+				if (videoEl) {
+					videoEl.setAttribute('scale', `${scale} ${scale} ${scale}`);
+				}
+				document.getElementById('size-val-display').innerText = val + 'x';
+			}
+
+			function zoomImage(imgId) {
+				const desc = imgDescriptions[imgId];
+				document.getElementById('gallery-desc-text').innerText = desc;
+
+				const clickedEl = document.getElementById(`entity-${imgId}`);
+				if (clickedEl) {
+					// Pequeño efecto de latido en escala
+					clickedEl.setAttribute('animation', {
+						property: 'scale',
+						from: '1 1 1',
+						to: '1.1 1.1 1.1',
+						dur: 200,
+						dir: 'alternate',
+						loop: 1
+					});
+				}
+			}
+
+			// Exponer global
+			window.togglePlay = togglePlay;
+			window.toggleMute = toggleMute;
+			window.changeSize = changeSize;
+			window.zoomImage = zoomImage;
+		</script>
+	</body>
+</html>
