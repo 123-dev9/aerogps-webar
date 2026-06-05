@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+		<title>AeroGPS - Demo Coordenada Fija</title>
+		
+		<!-- Fuentes Premium -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+		
+		<!-- Iconos Lucide -->
+		<script src="https://unpkg.com/lucide@latest"></script>
+
+		<!-- Estilos Compartidos -->
+		<link rel="stylesheet" href="./assets/css/style.css" />
+
+		<!-- Dependencias de 8th Wall y A-Frame -->
+		<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+		<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+	</head>
+
+	<body>
+		<!-- Glows de Fondo -->
+		<div class="bg-glow-container">
+			<div class="glow-orb orb-1"></div>
+			<div class="glow-orb orb-2"></div>
+		</div>
+
+		<!-- PANTALLA DE CARGA -->
+		<div id="loading-screen" class="hud-interactive">
+			<div class="loader"></div>
+			<p id="loading-text">Obteniendo permisos de GPS y Cámara...</p>
+		</div>
+
+		<!-- PANTALLA DE LANZAMIENTO -->
+		<div id="config-screen">
+			<div class="logo-container" style="margin-top: 40px;">
+				<div class="logo-icon">
+					<i data-lucide="navigation-2" style="color: white; width: 28px; height: 28px; fill: white;"></i>
+				</div>
+				<h1>AeroGPS Demo</h1>
+				<p>Visor Directo por GPS</p>
+			</div>
+
+			<div class="panel" style="max-width: 400px; text-align: center;">
+				<div>
+					<div class="section-title" style="justify-content: center; margin-bottom: 14px;">
+						<i data-lucide="map-pinned" style="width: 16px; height: 16px;"></i>
+						<span>Coordenada Fija de Destino</span>
+					</div>
+					
+					<div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; margin-bottom: 10px;">
+						<div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Ubicación de Prueba</div>
+						<div style="font-size: 20px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--accent-cyan); margin-top: 4px;">
+							41.296611, 2.760382
+						</div>
+					</div>
+					
+					<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 6px;">
+						El objeto 3D (Silla de Diseño) se posicionará en esta coordenada exacta. Podrás caminar a su alrededor, acercarte, alejarte o escalarlo con los dedos.
+					</p>
+				</div>
+
+				<button class="btn btn-primary" id="btn-start-demo" style="width: 100%;">
+					<i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+					INICIAR DEMO AR
+				</button>
+			</div>
+		</div>
+
+		<!-- CONTENEDOR DE LA ESCENA AR -->
+		<div id="scene-container"></div>
+
+		<!-- PANTALLA HUD OVERLAY EN AR -->
+		<div id="ar-hud">
+			<!-- HUD Top Bar -->
+			<div class="hud-top hud-interactive">
+				<button class="btn-back" id="btn-back-demo">
+					<i data-lucide="arrow-left" style="width: 20px; height: 20px;"></i>
+				</button>
+				<div class="live-indicator">
+					<div class="live-dot"></div>
+					<span>DEMO AR ACTIVA</span>
+				</div>
+			</div>
+
+			<!-- HUD Control Sidebar (Ajustes de Escala, Rotación y Elevación) -->
+			<div class="hud-controls-sidebar hud-interactive">
+				<div class="sidebar-tool" id="tool-scale">
+					<div class="sidebar-btn" id="btn-scale">
+						<i data-lucide="maximize" style="width: 18px; height: 18px;"></i>
+					</div>
+					<span>Escala</span>
+				</div>
+				<div class="sidebar-tool" id="tool-rotation">
+					<div class="sidebar-btn" id="btn-rotation">
+						<i data-lucide="rotate-3d" style="width: 18px; height: 18px;"></i>
+					</div>
+					<span>Rotación</span>
+				</div>
+				<div class="sidebar-tool" id="tool-elevation">
+					<div class="sidebar-btn" id="btn-elevation">
+						<i data-lucide="arrow-up-down" style="width: 18px; height: 18px;"></i>
+					</div>
+					<span>Altura</span>
+				</div>
+			</div>
+
+			<!-- Panel Deslizante de Ajuste -->
+			<div class="slider-overlay-panel hud-interactive" id="slider-panel">
+				<div class="slider-header">
+					<span id="slider-title">Ajuste de Escala</span>
+					<span id="slider-value">1.0x</span>
+				</div>
+				<input type="range" id="slider-input" min="0.1" max="10" step="0.05" value="1" class="slider-control" />
+			</div>
+
+			<!-- HUD Bottom Info Card -->
+			<div class="hud-bottom hud-interactive">
+				<div class="hud-info-grid">
+					<div class="hud-stat">
+						<span class="hud-stat-label">Objeto Seleccionado</span>
+						<span class="hud-stat-val" id="hud-model-name">Silla de Diseño</span>
+					</div>
+					<div class="hud-stat">
+						<span class="hud-stat-label">Dirección / Brújula</span>
+						<div class="compass-container">
+							<div class="compass-arrow-wrapper">
+								<div class="compass-arrow" id="compass-arrow"></div>
+							</div>
+							<span class="hud-stat-val" id="hud-bearing">--°</span>
+						</div>
+					</div>
+				</div>
+				
+				<div class="hud-info-grid" style="border: none; padding-bottom: 0;">
+					<div class="hud-stat">
+						<span class="hud-stat-label">Distancia al Objetivo</span>
+						<span class="hud-stat-val distance" id="hud-distance">Calculando...</span>
+					</div>
+					<div class="hud-stat">
+						<span class="hud-stat-label">GPS Fijo</span>
+						<span class="hud-stat-val" id="hud-target-gps" style="font-size: 12px; font-family: 'Space Grotesk', sans-serif;">41.296611, 2.760382</span>
+					</div>
+				</div>
+
+				<!-- Barra de Estado Inferior -->
+				<div class="hud-status-bar">
+					<div class="status-item">
+						<div class="status-dot"></div>
+						<span id="gps-accuracy-text">GPS: Sincronizando...</span>
+					</div>
+					<span id="device-heading-text">Sensor: --</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- Lógica de la Demostración -->
+		<script type="module">
+			import { GPSService } from './src/services/gps.js';
+			import { TelemetryService } from './src/services/telemetry.js';
+			import { AssetService } from './src/services/assets.js';
+			
+			import { registerAnchorManager } from './src/components/anchor-manager.js';
+			import { registerGestures } from './src/components/gestures.js';
+			import { registerGroundIndicator } from './src/components/ground-indicator.js';
+
+			import { HUDController } from './src/ui/hud.js';
+			import { LoaderController } from './src/ui/loader.js';
+			import { TutorialController } from './src/ui/tutorial.js';
+
+			// Coordenadas fijas solicitadas por el usuario
+			const TARGET_LAT = 41.296611;
+			const TARGET_LNG = 2.760382;
+
+			// Instanciar servicios
+			const gpsService = new GPSService();
+			const telemetryService = new TelemetryService();
+			const assetService = new AssetService();
+
+			// Registrar componentes A-Frame
+			registerAnchorManager(gpsService, telemetryService);
+			registerGestures();
+			registerGroundIndicator(telemetryService);
+
+			// Controladores de UI
+			const loaderController = new LoaderController();
+			const tutorialController = new TutorialController();
+			let hudController = null;
+
+			document.addEventListener("DOMContentLoaded", () => {
+				if (typeof lucide !== 'undefined') lucide.createIcons();
+
+				const startBtn = document.getElementById('btn-start-demo');
+				startBtn.onclick = startDemo;
+
+				const backBtn = document.getElementById('btn-back-demo');
+				backBtn.onclick = stopDemo;
+			});
+
+			function startDemo() {
+				// Fijar destino en el servicio GPS
+				gpsService.setTarget(TARGET_LAT, TARGET_LNG);
+
+				// Mostrar cargador
+				loaderController.show("Iniciando cámara y sincronizando GPS...");
+
+				// Iniciar geolocalización activa
+				gpsService.startTracking(
+					(coords) => {
+						console.log(`[Demo GPS] Ubicación usuario: ${coords.latitude}, ${coords.longitude}`);
+					},
+					(err) => {
+						telemetryService.logError(err, 'demoGPSTracking');
+					}
+				);
+
+				// Solicitar orientación en dispositivos iOS si es necesario
+				if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+					DeviceOrientationEvent.requestPermission()
+						.then(state => {
+							if (state !== 'granted') console.warn("DeviceOrientation denegado");
+						}).catch(console.error);
+				}
+
+				// Crear escena A-Frame dinámicamente con 8th Wall
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.innerHTML = `
+					<a-scene
+						xrweb="disableWorldTracking: false"
+						embedded
+						renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true;"
+					>
+						<a-assets>
+							<a-asset-item id="model-3d" src="./assets/Chair.glb"></a-asset-item>
+						</a-assets>
+
+						<!-- Indicador de detección de suelo -->
+						<a-entity ground-indicator id="reticle">
+							<a-ring color="#06b6d4" radius-inner="0.3" radius-outer="0.4" opacity="0.8"></a-ring>
+						</a-entity>
+
+						<!-- El modelo 3D con tu anclaje GPS-SLAM híbrido y gestos multitáctiles -->
+						<a-entity
+							id="ar-entity-model"
+							gltf-model="#model-3d"
+							anchor-manager="lat: ${TARGET_LAT}; lng: ${TARGET_LNG}; elevation: 0;"
+							gesture-controls="minScale: 2; maxScale: 150;"
+							scale="15 15 15"
+						></a-entity>
+
+						<a-camera position="0 1.6 0" raycaster="objects: #ar-entity-model" cursor="fuse: false; rayOrigin: mouse;"></a-camera>
+					</a-scene>
+				`;
+
+				// Ocultar pantalla de lanzamiento y mostrar AR
+				document.getElementById('config-screen').style.opacity = '0';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.display = 'none';
+					sceneContainer.style.display = 'block';
+
+					// Inicializar y mostrar HUD
+					hudController = new HUDController(gpsService, telemetryService, assetService, stopDemo);
+					hudController.show();
+
+					// Mostrar onboarding tutorial
+					tutorialController.show();
+
+					// Ocultar pantalla de carga cuando el objeto se fije en el espacio
+					const modelEntity = document.getElementById('ar-entity-model');
+					if (modelEntity) {
+						modelEntity.addEventListener('anchor-placed', () => {
+							loaderController.hide();
+						}, { once: true });
+					}
+
+					// Respaldo de carga
+					setTimeout(() => {
+						loaderController.hide();
+					}, 5000);
+
+				}, 500);
+			}
+
+			function stopDemo() {
+				loaderController.show("Cerrando visor de cámara...");
+				
+				gpsService.stopTracking();
+
+				if (hudController) {
+					hudController.hide();
+					hudController = null;
+				}
+				tutorialController.hide();
+
+				const sceneContainer = document.getElementById('scene-container');
+				sceneContainer.style.display = 'none';
+				sceneContainer.innerHTML = '';
+
+				document.querySelectorAll('video').forEach(v => {
+					if (v.srcObject) {
+						v.srcObject.getTracks().forEach(track => track.stop());
+					}
+					v.remove();
+				});
+
+				document.getElementById('config-screen').style.display = 'flex';
+				setTimeout(() => {
+					document.getElementById('config-screen').style.opacity = '1';
+					loaderController.hide();
+				}, 100);
+			}
+		</script>
+	</body>
+</html>
