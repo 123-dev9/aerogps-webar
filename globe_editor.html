@@ -606,9 +606,9 @@
     });
 
     function initCesium() {
-      // Usar token por defecto de Cesium para cargar Bing maps fotorrealistas
+      // Usar visor Cesium con cargador de mapa base habilitado por si un proveedor falla
       viewer = new Cesium.Viewer('cesiumContainer', {
-        baseLayerPicker: false,
+        baseLayerPicker: true,
         geocoder: true,
         navigationHelpButton: false,
         homeButton: true,
@@ -620,18 +620,32 @@
         scene3DOnly: true
       });
 
-      // Habilitar relieve 3D en el terreno
-      viewer.terrainProvider = Cesium.createWorldTerrain ? Cesium.createWorldTerrain({
-        requestVertexNormals: true,
-        requestWaterMask: true
-      }) : undefined;
+      // Habilitar relieve 3D de forma segura sin romper la app ante faltas de tokens
+      try {
+        if (typeof Cesium.createWorldTerrainAsync === 'function') {
+          Cesium.createWorldTerrainAsync({
+            requestVertexNormals: true,
+            requestWaterMask: true
+          }).then(provider => {
+            viewer.terrainProvider = provider;
+          }).catch(e => console.warn("No se pudo cargar el proveedor de relieve asíncrono:", e));
+        } else if (typeof Cesium.createWorldTerrain === 'function') {
+          viewer.terrainProvider = Cesium.createWorldTerrain({
+            requestVertexNormals: true,
+            requestWaterMask: true
+          });
+        }
+      } catch (e) {
+        console.warn("Relieve 3D no soportado o error de token. Usando el globo elipsoide plano:", e);
+      }
 
-      // Ubicación por defecto de la cámara: Girona, España (Centro del proyecto)
+      // Ubicación de la cámara: Vista global desde el espacio (10,000 km de altura)
+      // Centrado sobre la Península Ibérica / Europa mirando directamente hacia abajo
       viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(2.826359, 41.987679, 1500),
+        destination: Cesium.Cartesian3.fromDegrees(2.826359, 41.987679, 10000000.0),
         orientation: {
           heading: Cesium.Math.toRadians(0),
-          pitch: Cesium.Math.toRadians(-60),
+          pitch: Cesium.Math.toRadians(-90), // Apuntando al centro de la Tierra
           roll: 0.0
         }
       });
@@ -955,7 +969,7 @@
 
     function flyToPosition(pos) {
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(pos.lng, pos.lat, 250),
+        destination: Cesium.Cartesian3.fromDegrees(pos.lng, pos.lat, 1000), // Aumentado a 1000m para evitar colisiones con relieve
         orientation: {
           heading: Cesium.Math.toRadians(pos.heading || 0),
           pitch: Cesium.Math.toRadians(-45),
