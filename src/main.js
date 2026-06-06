@@ -2,6 +2,7 @@ import { GPSService } from './services/gps.js';
 import { TelemetryService } from './services/telemetry.js';
 import { AssetService } from './services/assets.js';
 import { MonumentsService } from './services/monuments.js';
+import { CustomPositionsService } from './services/custom-positions.js';
 
 import { registerAnchorManager } from './components/anchor-manager.js';
 import { registerGestures } from './components/gestures.js';
@@ -17,6 +18,7 @@ const gpsService = new GPSService();
 const telemetryService = new TelemetryService();
 const assetService = new AssetService();
 const monumentsService = new MonumentsService(gpsService);
+const customPositionsService = new CustomPositionsService(monumentsService, gpsService, assetService);
 
 // Registrar componentes de A-Frame vinculando servicios
 registerAnchorManager(gpsService, telemetryService);
@@ -84,13 +86,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }).join('');
   }
 
+  // Llenar selector de modelos en el gestor de posiciones personalizadas
+  const customModelSelect = document.getElementById('custom-model-select');
+  if (customModelSelect) {
+    customModelSelect.innerHTML = assetService.getCatalog().map(model => {
+      const emoji = getEmojiForModel(model.id);
+      return `<option value="${model.id}">${emoji} ${model.name}</option>`;
+    }).join('');
+  }
+
   // Cargar base de datos local de monumentos e iniciar el mapa
   monumentsService.loadMonuments().then(() => {
     mapController = new MapController(gpsService, monumentsService, startARForMonument);
     mapController.initMap('map-container');
   });
 
-  // Activar geolocalización de fondo para actualizar el mapa en vivo
+  // Activar geolocalización de fondo para actualizar el mapa en vivo y las distancias personalizadas
   gpsService.startTracking(
     (coords) => {
       console.log(`[GPS Track] Lat: ${coords.latitude}, Lng: ${coords.longitude}`);
@@ -99,6 +110,21 @@ document.addEventListener("DOMContentLoaded", () => {
       telemetryService.logError(err, 'gpsBackgroundTracking');
     }
   );
+
+  // Suscripción al GPS para actualizar la lista de distancias personalizadas en tiempo real
+  gpsService.subscribe((gpsData) => {
+    const cpView = document.getElementById('custom-positions-view');
+    if (cpView && cpView.style.display !== 'none') {
+      const positions = customPositionsService.getPositions();
+      positions.forEach(pos => {
+        const distEl = document.getElementById(`dist-${pos.id}`);
+        if (distEl && gpsData.userCoords.lat !== null) {
+          const dist = gpsService.calculateHaversine(gpsData.userCoords.lat, gpsData.userCoords.lng, pos.lat, pos.lng);
+          distEl.innerText = dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist.toFixed(0)} m`;
+        }
+      });
+    }
+  });
 });
 
 // Helper de iconos emoji para el catálogo
@@ -131,6 +157,9 @@ function switchView(viewId) {
   document.getElementById('map-view').style.display = 'none';
   document.getElementById('character-view').style.display = 'none';
   document.getElementById('sandbox-view').style.display = 'none';
+  
+  const customPosView = document.getElementById('custom-positions-view');
+  if (customPosView) customPosView.style.display = 'none';
 
   const specialDemos = document.getElementById('special-demos-view');
   const galleryTitle = document.getElementById('gallery-title');
@@ -154,6 +183,11 @@ function switchView(viewId) {
     if (targetView) {
       targetView.style.display = 'block';
     }
+  }
+
+  // Cargar lista de posiciones guardadas si es la vista del gestor
+  if (viewId === 'custom-positions') {
+    renderCustomPositionsList();
   }
 
   // Si abrimos la vista del mapa, necesitamos forzar el redimensionado en MapLibre GL
@@ -544,6 +578,221 @@ function stopAR() {
   }, 100);
 }
 
+// ====================================================
+// LOGICA DE POSICIONES PERSONALIZADAS (UI EVENT HANDLERS)
+// ====================================================
+
+function renderCustomPositionsList() {
+  const listContainer = document.getElementById('custom-positions-list');
+  if (!listContainer) return;
+
+  const positions = customPositionsService.getPositions();
+  if (positions.length === 0) {
+    listContainer.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 24px; border: 1px dashed var(--border-color); border-radius: 16px; background: rgba(0,0,0,0.1); width: 100%;">
+        No tienes posiciones guardadas. ¡Usa el formulario para crear una!
+      </div>
+    `;
+    return;
+  }
+
+  const catalog = assetService.getCatalog();
+  const userLat = gpsService.userCoords.lat;
+  const userLng = gpsService.userCoords.lng;
+
+  listContainer.innerHTML = positions.map(pos => {
+    const model = catalog.find(m => m.id === pos.modelo) || { name: pos.modelo };
+    const emoji = getEmojiForModel(pos.modelo);
+    
+    let distanceText = '--';
+    if (userLat !== null && userLng !== null) {
+      const dist = gpsService.calculateHaversine(userLat, userLng, pos.lat, pos.lng);
+      distanceText = dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist.toFixed(0)} m`;
+    }
+
+    return `
+      <div class="custom-pos-card" id="pos-card-${pos.id}">
+        <div class="custom-pos-header">
+          <span class="custom-pos-title">${pos.nombre}</span>
+          <span class="custom-pos-distance" id="dist-${pos.id}">${distanceText}</span>
+        </div>
+        <div class="custom-pos-meta">
+          <div class="custom-pos-model">
+            <span>${emoji}</span>
+            <span>${model.name}</span>
+          </div>
+          <span class="custom-pos-coords">${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</span>
+        </div>
+        <div class="custom-pos-actions">
+          <button class="btn-card-action btn-card-ar" onclick="startCustomPositionAR('${pos.id}')">
+            <i data-lucide="sparkles" style="width: 12px; height: 12px;"></i> Iniciar AR
+          </button>
+          <button class="btn-card-action btn-card-map" onclick="showCustomPositionOnMap('${pos.id}')">
+            <i data-lucide="map" style="width: 12px; height: 12px;"></i> Mapa
+          </button>
+          <button class="btn-card-action btn-card-delete" onclick="deleteCustomPosition('${pos.id}')">
+            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function getCustomCurrentGPS() {
+  const gpsBtn = document.querySelector('#custom-positions-view .btn-gps');
+  const origContent = gpsBtn.innerHTML;
+  gpsBtn.innerHTML = `<i data-lucide="loader" class="spin" style="width: 16px; height: 16px;"></i> Buscando...`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      document.getElementById('custom-lat-input').value = position.coords.latitude.toFixed(6);
+      document.getElementById('custom-lng-input').value = position.coords.longitude.toFixed(6);
+      gpsBtn.innerHTML = origContent;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    },
+    (err) => {
+      telemetryService.logError(err, 'getCustomCurrentGPS');
+      alert(`No se pudo obtener el GPS: ${err.message}`);
+      gpsBtn.innerHTML = origContent;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    },
+    { enableHighAccuracy: true, timeout: 5000 }
+  );
+}
+
+function setCustomOffsetGPS() {
+  const offsetBtn = document.querySelector('#custom-positions-view .btn-offset');
+  const origContent = offsetBtn.innerHTML;
+  offsetBtn.innerHTML = `<i data-lucide="loader" class="spin" style="width: 16px; height: 16px;"></i> Localizando...`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+      
+      const offsetMeters = 5;
+      const latOffset = offsetMeters / 111111;
+      const newLat = userLat + latOffset;
+      const newLng = userLng;
+
+      document.getElementById('custom-lat-input').value = newLat.toFixed(6);
+      document.getElementById('custom-lng-input').value = newLng.toFixed(6);
+      
+      offsetBtn.innerHTML = origContent;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    },
+    (err) => {
+      telemetryService.logError(err, 'setCustomOffsetGPS');
+      alert(`Error de offset: ${err.message}`);
+      offsetBtn.innerHTML = origContent;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    },
+    { enableHighAccuracy: true, timeout: 5000 }
+  );
+}
+
+function saveNewCustomPosition() {
+  const nameInput = document.getElementById('custom-name-input');
+  const modelSelect = document.getElementById('custom-model-select');
+  const latInput = document.getElementById('custom-lat-input');
+  const lngInput = document.getElementById('custom-lng-input');
+  const scaleInput = document.getElementById('custom-scale-input');
+  const elevationInput = document.getElementById('custom-elevation-input');
+
+  const name = nameInput.value;
+  const modelId = modelSelect.value;
+  const lat = parseFloat(latInput.value);
+  const lng = parseFloat(lngInput.value);
+  const scaleMultiplier = parseFloat(scaleInput.value || 1.0);
+  const elevation = parseFloat(elevationInput.value || 0.0);
+
+  if (isNaN(lat) || isNaN(lng)) {
+    alert('Ingresa coordenadas de latitud y longitud válidas.');
+    return;
+  }
+
+  customPositionsService.savePosition(name, modelId, lat, lng, scaleMultiplier, elevation);
+  
+  // Limpiar campos
+  nameInput.value = '';
+  latInput.value = '';
+  lngInput.value = '';
+  scaleInput.value = '1.0';
+  elevationInput.value = '0.0';
+
+  renderCustomPositionsList();
+}
+
+function deleteCustomPosition(id) {
+  if (confirm('¿Deseas eliminar esta posición personalizada? Se quitará de tu lista y del mapa.')) {
+    customPositionsService.deletePosition(id);
+    renderCustomPositionsList();
+  }
+}
+
+function startCustomPositionAR(id) {
+  const positions = customPositionsService.getPositions();
+  const pos = positions.find(p => p.id === id);
+  if (pos) {
+    startARForMonument({
+      id: pos.id,
+      nombre: pos.nombre,
+      lat: pos.lat,
+      lng: pos.lng,
+      modelo: pos.modelo,
+      defaultScale: pos.defaultScale,
+      defaultElevation: pos.defaultElevation,
+      isCustom: true
+    });
+  }
+}
+
+function showCustomPositionOnMap(id) {
+  const positions = customPositionsService.getPositions();
+  const pos = positions.find(p => p.id === id);
+  if (pos && mapController) {
+    switchView('map');
+    setTimeout(() => {
+      mapController.selectMonument(pos.id);
+    }, 200);
+  }
+}
+
+function exportPositionsToText() {
+  const jsonString = customPositionsService.exportPositions();
+  const textarea = document.getElementById('import-export-area');
+  textarea.value = jsonString;
+  
+  navigator.clipboard.writeText(jsonString).then(() => {
+    alert('JSON de posiciones copiado al portapapeles. Puedes pegarlo en el chat.');
+  }).catch(err => {
+    alert('No se pudo copiar automáticamente. Por favor, copia el texto del cuadro manualmente.');
+  });
+}
+
+function importPositionsFromText() {
+  const textarea = document.getElementById('import-export-area');
+  const jsonString = textarea.value;
+  if (!jsonString.trim()) {
+    alert('Pega un JSON válido en el cuadro de texto para importarlo.');
+    return;
+  }
+
+  try {
+    customPositionsService.importPositions(jsonString);
+    textarea.value = '';
+    renderCustomPositionsList();
+    alert('Posiciones importadas con éxito. Ahora aparecen en tu lista y en el mapa.');
+  } catch (e) {
+    alert('Error al importar posiciones: ' + e.message);
+  }
+}
+
 // Exportar al objeto global window para enlaces HTML
 window.selectModel = selectModel;
 window.getCurrentGPS = getCurrentGPS;
@@ -554,3 +803,14 @@ window.switchView = switchView;
 window.selectCharacter = selectCharacter;
 window.startCharacterAR = startCharacterAR;
 window.startMultiversoAR = startMultiversoAR;
+
+// Exponer las nuevas funciones del gestor de posiciones
+window.renderCustomPositionsList = renderCustomPositionsList;
+window.getCustomCurrentGPS = getCustomCurrentGPS;
+window.setCustomOffsetGPS = setCustomOffsetGPS;
+window.saveNewCustomPosition = saveNewCustomPosition;
+window.deleteCustomPosition = deleteCustomPosition;
+window.startCustomPositionAR = startCustomPositionAR;
+window.showCustomPositionOnMap = showCustomPositionOnMap;
+window.exportPositionsToText = exportPositionsToText;
+window.importPositionsFromText = importPositionsFromText;

@@ -111,11 +111,11 @@ export class MapController {
       }
     });
 
-    // Cerrar el panel si se hace click en el mapa vacío
+    // Mostrar selector de colocación si se hace click en el mapa vacío
     this.map.on('click', (e) => {
       // Ignorar clicks sobre marcadores
       if (e.originalEvent.target.closest('.mapboxgl-marker')) return;
-      this.hideDrawer();
+      this.showPlaceModelPrompt(e.lngLat.lat, e.lngLat.lng);
     });
   }
 
@@ -160,16 +160,51 @@ export class MapController {
   updateMarkers(monumentsList) {
     if (!this.map) return;
 
+    // 1. Eliminar marcadores que ya no existen en la lista
+    const currentIds = new Set(monumentsList.map(m => m.id));
+    for (const [id, marker] of this.monumentMarkers.entries()) {
+      if (!currentIds.has(id)) {
+        marker.remove();
+        this.monumentMarkers.delete(id);
+      }
+    }
+
+    // Helper para obtener el emoji según el ID del modelo
+    const getModelEmoji = (modelId) => {
+      switch (modelId) {
+        case 'Chair': return '🪑';
+        case 'GeoPlanter': return '🪴';
+        case 'Dragon': return '🐉';
+        case 'charizard_flying_animation': return '🔥';
+        case 'FerrisWheel': return '🎡';
+        case 'Bat': return '🦇';
+        case 'toon-bat': return '🦇';
+        case 'Sweeper': return '🤖';
+        case 'girl_look_around': return '👩';
+        case 'paul_talking_business': return '👨';
+        case 'pokemon_3ds_meowth': return '🐱';
+        case 'pokemon_3ds_scizor': return '✂️';
+        case 'pokemon_pokedex_3d_pro_infernape': return '🐒';
+        default: return '📦';
+      }
+    };
+
+    // 2. Dibujar o actualizar los marcadores
     monumentsList.forEach((monument) => {
+      const isCustom = monument.isCustom;
+      const normalBorderColor = isCustom ? '#f59e0b' : 'var(--primary)';
+      const activeBorderColor = 'var(--accent-green)';
+      const finalBorderColor = monument.inRange ? activeBorderColor : normalBorderColor;
+
       if (!this.monumentMarkers.has(monument.id)) {
         // Marcador HTML personalizado (estilo pin futurista)
         const el = document.createElement('div');
-        el.className = `monument-marker pin-${monument.id}`;
+        el.className = `monument-marker pin-${monument.id} ${isCustom ? 'custom-marker' : ''}`;
         el.style.cssText = `
           width: 32px;
           height: 32px;
           background: rgba(10, 14, 26, 0.85);
-          border: 2px solid ${monument.inRange ? 'var(--accent-green)' : 'var(--primary)'};
+          border: 2px solid ${finalBorderColor};
           border-radius: 50% 50% 50% 0;
           transform: rotate(-45deg);
           display: flex;
@@ -177,11 +212,11 @@ export class MapController {
           justify-content: center;
           cursor: pointer;
           transition: all 0.3s;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+          box-shadow: 0 4px 12px ${isCustom ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0,0,0,0.3)'};
         `;
 
         const iconEl = document.createElement('div');
-        iconEl.innerHTML = `📍`;
+        iconEl.innerHTML = isCustom ? getModelEmoji(monument.modelo) : '📍';
         iconEl.style.cssText = `
           transform: rotate(45deg);
           font-size: 14px;
@@ -203,7 +238,7 @@ export class MapController {
         // Actualizar color de borde según el rango
         const marker = this.monumentMarkers.get(monument.id);
         const el = marker.getElement();
-        el.style.borderColor = monument.inRange ? 'var(--accent-green)' : 'var(--primary)';
+        el.style.borderColor = finalBorderColor;
       }
     });
   }
@@ -274,6 +309,74 @@ export class MapController {
       startArBtn.onclick = () => {
         this.hideDrawer();
         if (this.onStartAR) this.onStartAR(monument);
+      };
+    }
+
+    // Mostrar deslizándolo hacia arriba
+    this.drawerEl.style.bottom = '16px';
+  }
+
+  showPlaceModelPrompt(lat, lng) {
+    this.selectedMonumentId = null; // Desmarcar monumentos activos
+    
+    this.drawerEl.innerHTML = `
+      <div style="width: 40px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; align-self: center; margin-bottom: 4px;"></div>
+      <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div>
+          <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; color: #fff;">📍 Colocar Objeto 3D Aquí</h2>
+          <p style="font-size: 11px; text-transform: uppercase; color: var(--accent-cyan); font-weight: 600; letter-spacing: 0.5px; margin-top: 2px;">
+            Coordenadas: ${lat.toFixed(6)}, ${lng.toFixed(6)}
+          </p>
+        </div>
+        <button id="close-drawer-btn" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size: 18px;">&times;</button>
+      </div>
+      <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4; margin: 4px 0 10px 0;">
+        Puedes añadir este punto geográfico a tus anclajes personalizados para asignarle un modelo GLB (como el Dragón, Noria o Silla) y verlo en Realidad Aumentada.
+      </p>
+      
+      <div style="display: flex; gap: 10px; margin-top: 4px;">
+        <button id="cancel-place-btn" class="btn" style="flex: 1; padding: 12px; font-size: 13px; border-radius: 10px;">
+          Cancelar
+        </button>
+        <button id="confirm-place-btn" class="btn btn-primary" style="flex: 2; margin-top: 0; padding: 12px; font-size: 13px; border-radius: 10px;">
+          <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+          Colocar Modelo 3D
+        </button>
+      </div>
+    `;
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Cerrar con el botón de cruz
+    const closeBtn = this.drawerEl.querySelector('#close-drawer-btn');
+    if (closeBtn) closeBtn.onclick = () => this.hideDrawer();
+
+    // Cancelar
+    const cancelBtn = this.drawerEl.querySelector('#cancel-place-btn');
+    if (cancelBtn) cancelBtn.onclick = () => this.hideDrawer();
+
+    // Confirmar y redirigir
+    const confirmBtn = this.drawerEl.querySelector('#confirm-place-btn');
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideDrawer();
+        
+        // Cambiar a la vista del gestor de posiciones
+        if (window.switchView) {
+          window.switchView('custom-positions');
+        }
+        
+        // Rellenar automáticamente los inputs en el formulario
+        const latInput = document.getElementById('custom-lat-input');
+        const lngInput = document.getElementById('custom-lng-input');
+        const nameInput = document.getElementById('custom-name-input');
+        
+        if (latInput) latInput.value = lat.toFixed(6);
+        if (lngInput) lngInput.value = lng.toFixed(6);
+        if (nameInput) {
+          nameInput.value = `Punto Mapa - ${Math.floor(1000 + Math.random() * 9000)}`;
+          nameInput.focus();
+        }
       };
     }
 

@@ -23,6 +23,9 @@ export class MonumentsService {
   /**
    * Carga los datos de los monumentos desde el archivo JSON
    */
+  /**
+   * Carga los datos de los monumentos desde el archivo JSON y las posiciones del usuario
+   */
   async loadMonuments() {
     try {
       const response = await fetch('./src/data/monumentos.json');
@@ -30,12 +33,46 @@ export class MonumentsService {
         throw new Error(`Error HTTP: ${response.status}`);
       }
       this.monuments = await response.json();
-      this.notify();
+      this.loadCustomPositions();
       return this.monuments;
     } catch (e) {
       console.error("[MonumentsService] Error al cargar monumentos.json:", e);
+      // Intentar al menos cargar las posiciones personalizadas si falla el JSON
+      this.loadCustomPositions();
       return [];
     }
+  }
+
+  /**
+   * Carga las posiciones personalizadas guardadas en localStorage
+   */
+  loadCustomPositions() {
+    // Filtrar monumentos por defecto para no duplicarlos
+    this.monuments = this.monuments.filter(m => !m.isCustom);
+    
+    try {
+      const customData = localStorage.getItem('custom_positions');
+      if (customData) {
+        const customPositions = JSON.parse(customData);
+        customPositions.forEach(pos => {
+          this.monuments.push({
+            id: pos.id,
+            nombre: pos.nombre,
+            lat: parseFloat(pos.lat),
+            lng: parseFloat(pos.lng),
+            modelo: pos.modelo,
+            descripcion: `Modelo 3D (${pos.modelo}) personalizado por el usuario.`,
+            defaultScale: pos.defaultScale,
+            defaultElevation: pos.defaultElevation,
+            isCustom: true
+          });
+        });
+      }
+    } catch (e) {
+      console.error("[MonumentsService] Error al decodificar posiciones de localStorage:", e);
+    }
+    
+    this.notify();
   }
 
   /**
