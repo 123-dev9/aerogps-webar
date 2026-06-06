@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>AeroGPS - Editor de Globo 3D</title>
+
+  <!-- Fuentes Premium (Google Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Iconos (Lucide Icons via CDN) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- CesiumJS CSS y JS desde CDN -->
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0a0e1a;
+      --bg-card: rgba(10, 14, 26, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --primary: #4f46e5;
+      --primary-glow: rgba(79, 70, 229, 0.3);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.2);
+      --accent-green: #10b981;
+      --accent-orange: #ea580c;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+    }
+
+    /* Contenedor Cesium */
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    /* Ocultar botones e info comercial de Cesium de forma estética */
+    .cesium-viewer-bottom {
+      display: none !important;
+    }
+
+    /* Glow de Fondo */
+    .bg-glow {
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      background: var(--primary);
+      filter: blur(100px);
+      opacity: 0.1;
+      top: -100px;
+      left: -100px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Panel Lateral de Edición */
+    .editor-sidebar {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 380px;
+      max-width: calc(100% - 40px);
+      max-height: calc(100% - 40px);
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 24px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+    }
+
+    .editor-sidebar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .editor-sidebar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 14px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent-orange), var(--primary));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px rgba(234, 88, 12, 0.3);
+    }
+
+    .logo-text h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .logo-text p {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .input-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .input-wrapper label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .input-field {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      transition: all 0.3s;
+      width: 100%;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 8px rgba(234, 88, 12, 0.2);
+    }
+
+    .coord-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* Sliders de Ajuste */
+    .slider-group {
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .slider-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .slider-header span.val {
+      color: var(--accent-orange);
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .slider-control {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .slider-control::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-orange);
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(234, 88, 12, 0.5);
+      transition: transform 0.1s;
+    }
+
+    .slider-control::-webkit-slider-thumb:active {
+      transform: scale(1.25);
+    }
+
+    /* Botones */
+    .btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.25s;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-orange) 0%, #f97316 100%);
+      border: none;
+      font-weight: 700;
+      box-shadow: 0 4px 15px rgba(234, 88, 12, 0.2);
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(234, 88, 12, 0.3);
+    }
+
+    /* Tarjetas de Posición en Lista */
+    .positions-list-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .pos-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .pos-card:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(234, 88, 12, 0.3);
+    }
+
+    .pos-card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex-grow: 1;
+      min-width: 0;
+    }
+
+    .pos-card-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pos-card-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pos-card-emoji {
+      font-size: 14px;
+    }
+
+    .pos-card-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-card-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .btn-card-icon:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-card-icon.edit:hover {
+      color: var(--accent-orange);
+      border-color: rgba(234, 88, 12, 0.3);
+      background: rgba(234, 88, 12, 0.05);
+    }
+
+    .btn-card-icon.delete:hover {
+      color: #ef4444;
+      border-color: rgba(239, 68, 68, 0.3);
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    /* Caja de Instrucciones en el Mapa */
+    .map-instructions {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(10, 14, 26, 0.85);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 12px 18px;
+      font-size: 12px;
+      color: var(--text-main);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 10;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-orange);
+      border-radius: 50%;
+      animation: pulse-orange 1.5s infinite;
+    }
+
+    @keyframes pulse-orange {
+      0% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(234, 88, 12, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0); }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Visor Cesium -->
+  <div id="cesiumContainer"></div>
+
+  <!-- Instrucciones Flotantes -->
+  <div class="map-instructions">
+    <div class="pulse-dot"></div>
+    <span>Haz clic en cualquier punto del globo para colocar un modelo</span>
+  </div>
+
+  <!-- Panel Lateral -->
+  <div class="editor-sidebar">
+    <div class="logo-container">
+      <div class="logo-icon">
+        <i data-lucide="globe" style="color: white; width: 22px; height: 22px;"></i>
+      </div>
+      <div class="logo-text">
+        <h1>AeroGPS Editor 3D</h1>
+        <p>Posicionamiento de Modelos</p>
+      </div>
+    </div>
+
+    <!-- Sección Formulario -->
+    <div>
+      <div class="section-title">
+        <i data-lucide="map-pin" style="width: 14px; height: 14px;"></i>
+        <span>Configurar Posición</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="input-wrapper">
+          <label for="custom-name-input">Nombre del Lugar</label>
+          <input type="text" id="custom-name-input" class="input-field" placeholder="Ej. Mi Oficina, Parque" />
+        </div>
+
+        <div class="input-wrapper">
+          <label for="custom-model-select">Modelo 3D GLB</label>
+          <select id="custom-model-select" class="input-field" style="background: rgba(10, 14, 26, 0.95); color: white;">
+            <!-- Se llenará dinámicamente -->
+          </select>
+        </div>
+
+        <div class="coord-grid">
+          <div class="input-wrapper">
+            <label for="custom-lat-input">Latitud</label>
+            <input type="number" id="custom-lat-input" step="0.000001" class="input-field" placeholder="41.987679" />
+          </div>
+          <div class="input-wrapper">
+            <label for="custom-lng-input">Longitud</label>
+            <input type="number" id="custom-lng-input" step="0.000001" class="input-field" placeholder="2.826359" />
+          </div>
+        </div>
+
+        <!-- Sliders de Ajuste -->
+        <div class="slider-group">
+          <!-- Slider Escala -->
+          <div class="slider-wrapper">
+            <div class="slider-header">
+              <span>Escala (Multiplicador)</span>
+              <span class="val" id="scale-val">1.0x</span>
+            </div>
+            <input type="range" id="custom-scale-input" min="0.1" max="10" step="0.1" value="1.0" class="slider-control" />
+          </div>
+
+          <!-- Slider Altura -->
+          <div class="slider-wrapper">
+            <div class="slider-header">
+              <span>Altura del Suelo (m)</span>
+              <span class="val" id="elevation-val">0.0m</span>
+            </div>
+            <input type="range" id="custom-elevation-input" min="-10" max="50" step="0.5" value="0.0" class="slider-control" />
+          </div>
+
+          <!-- Slider Rotación -->
+          <div class="slider-wrapper">
+            <div class="slider-header">
+              <span>Rotación Horizontal (°)</span>
+              <span class="val" id="heading-val">0°</span>
+            </div>
+            <input type="range" id="custom-heading-input" min="0" max="360" step="5" value="0" class="slider-control" />
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="save-btn" onclick="savePosition()">
+          <i data-lucide="plus" style="width: 15px; height: 15px;"></i>
+          Guardar Posición
+        </button>
+        
+        <button class="btn" id="cancel-btn" style="display: none; border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); color: #f87171;" onclick="cancelEditing()">
+          <i data-lucide="x" style="width: 15px; height: 15px;"></i>
+          Cancelar Edición
+        </button>
+      </div>
+    </div>
+
+    <!-- Lista de Posiciones -->
+    <div>
+      <div class="section-title">
+        <i data-lucide="list" style="width: 14px; height: 14px;"></i>
+        <span>Posiciones Guardadas</span>
+      </div>
+      <div class="positions-list-container" id="positions-list">
+        <!-- Se llena dinámicamente -->
+      </div>
+    </div>
+
+    <!-- Botones de Acción Global -->
+    <div style="border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button class="btn" onclick="exportJSON()">
+          <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
+          Copiar JSON
+        </button>
+        <button class="btn" onclick="importJSON()">
+          <i data-lucide="upload" style="width: 14px; height: 14px;"></i>
+          Importar JSON
+        </button>
+      </div>
+      <button class="btn" onclick="location.href='index.html'" style="border-color: rgba(6, 182, 212, 0.3); background: rgba(6, 182, 212, 0.05); color: var(--accent-cyan);">
+        <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i>
+        Volver a la App WebAR
+      </button>
+    </div>
+  </div>
+
+  <!-- Script Lógica principal con Cesium e importación de assets -->
+  <script type="module">
+    import { AssetService } from './src/services/assets.js';
+
+    const assetService = new AssetService();
+    const catalog = assetService.getCatalog();
+    let viewer = null;
+    let editingPositionId = null;
+    let previewEntity = null;
+    const modelEntities = new Map(); // id -> entity
+
+    // Emojis de fallback segun modelo
+    function getEmoji(modelId) {
+      switch (modelId) {
+        case 'Chair': return '🪑';
+        case 'GeoPlanter': return '🪴';
+        case 'Dragon': return '🐉';
+        case 'charizard_flying_animation': return '🔥';
+        case 'FerrisWheel': return '🎡';
+        case 'Bat': return '🦇';
+        case 'toon-bat': return '🦇';
+        case 'Sweeper': return '🤖';
+        case 'girl_look_around': return '👩';
+        case 'paul_talking_business': return '👨';
+        case 'pokemon_3ds_meowth': return '🐱';
+        case 'pokemon_3ds_scizor': return '✂️';
+        case 'pokemon_pokedex_3d_pro_infernape': return '🐒';
+        default: return '📦';
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Crear iconos Lucide
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+
+      // Rellenar selector de modelos GLB
+      const selectEl = document.getElementById('custom-model-select');
+      if (selectEl) {
+        selectEl.innerHTML = catalog.map(model => {
+          return `<option value="${model.id}">${getEmoji(model.id)} ${model.name}</option>`;
+        }).join('');
+      }
+
+      // Inicializar Cesium Viewer
+      initCesium();
+
+      // Cargar lista y renderizar modelos
+      renderList();
+      drawModelsOnGlobe();
+
+      // Suscribirse a cambios en inputs para actualizar la vista previa live
+      const inputsToListen = [
+        'custom-lat-input',
+        'custom-lng-input',
+        'custom-model-select',
+        'custom-scale-input',
+        'custom-elevation-input',
+        'custom-heading-input'
+      ];
+      inputsToListen.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', updateLivePreview);
+          el.addEventListener('change', updateLivePreview);
+        }
+      });
+
+      // Vincula valores de Sliders a las etiquetas de texto del HUD
+      setupSlidersText();
+    });
+
+    function initCesium() {
+      // Usar token por defecto de Cesium para cargar Bing maps fotorrealistas
+      viewer = new Cesium.Viewer('cesiumContainer', {
+        baseLayerPicker: false,
+        geocoder: true,
+        navigationHelpButton: false,
+        homeButton: true,
+        sceneModePicker: true,
+        timeline: false,
+        animation: false,
+        infoBox: false,
+        selectionIndicator: false,
+        scene3DOnly: true
+      });
+
+      // Habilitar relieve 3D en el terreno
+      viewer.terrainProvider = Cesium.createWorldTerrain ? Cesium.createWorldTerrain({
+        requestVertexNormals: true,
+        requestWaterMask: true
+      }) : undefined;
+
+      // Ubicación por defecto de la cámara: Girona, España (Centro del proyecto)
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(2.826359, 41.987679, 1500),
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-60),
+          roll: 0.0
+        }
+      });
+
+      // Configurar detector de clics en el terreno satelital
+      const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      handler.setInputAction((click) => {
+        // Obtener el rayo desde la posición del puntero
+        const ray = viewer.camera.getPickRay(click.position);
+        // Capturar la posición en el globo con relieve
+        const position = viewer.scene.globe.pick(ray, viewer.scene);
+        if (Cesium.defined(position)) {
+          const cartographic = Cesium.Cartographic.fromCartesian(position);
+          const lat = Cesium.Math.toDegrees(cartographic.latitude);
+          const lng = Cesium.Math.toDegrees(cartographic.longitude);
+          
+          document.getElementById('custom-lat-input').value = lat.toFixed(6);
+          document.getElementById('custom-lng-input').value = lng.toFixed(6);
+
+          if (!editingPositionId && !document.getElementById('custom-name-input').value) {
+            document.getElementById('custom-name-input').value = `Punto Mapa - ${Math.floor(1000 + Math.random() * 9000)}`;
+          }
+
+          updateLivePreview();
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+
+    function getPositions() {
+      try {
+        const data = localStorage.getItem('custom_positions');
+        return data ? JSON.parse(data) : [];
+      } catch (e) {
+        console.error("Error leyendo localStorage:", e);
+        return [];
+      }
+    }
+
+    function drawModelsOnGlobe() {
+      // Limpiar modelos dibujados previamente
+      for (const entity of modelEntities.values()) {
+        viewer.entities.remove(entity);
+      }
+      modelEntities.clear();
+
+      const positions = getPositions();
+      positions.forEach(pos => {
+        // Si es el que estamos editando actualmente, ocultarlo para no duplicarlo con la vista previa
+        if (editingPositionId && pos.id === editingPositionId) return;
+
+        const modelInfo = catalog.find(m => m.id === pos.modelo) || catalog[0];
+        const scale = pos.defaultScale ? pos.defaultScale.x : 1.0;
+        const elevation = pos.defaultElevation !== undefined ? pos.defaultElevation : 0.0;
+        const headingDeg = pos.heading !== undefined ? pos.heading : 0;
+        
+        const heading = Cesium.Math.toRadians(headingDeg);
+        const hpr = new Cesium.HeadingPitchRoll(heading, 0, 0);
+        const positionCartesian = Cesium.Cartesian3.fromDegrees(pos.lng, pos.lat, elevation);
+        const orientation = Cesium.Transforms.headingPitchRollQuaternion(positionCartesian, hpr);
+
+        const entity = viewer.entities.add({
+          id: pos.id,
+          name: pos.nombre,
+          position: positionCartesian,
+          orientation: orientation,
+          model: {
+            uri: `./assets/${modelInfo.file}`,
+            minimumPixelSize: 128,
+            maximumScale: 50
+          },
+          label: {
+            text: `${getEmoji(pos.modelo)} ${pos.nombre}`,
+            font: 'bold 12px Outfit, sans-serif',
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 3,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            pixelOffset: new Cesium.Cartesian2(0, -60),
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY // Asegura que se vea por encima de montañas
+          }
+        });
+
+        modelEntities.set(pos.id, entity);
+      });
+    }
+
+    function updateLivePreview() {
+      const lat = parseFloat(document.getElementById('custom-lat-input').value);
+      const lng = parseFloat(document.getElementById('custom-lng-input').value);
+      const modelId = document.getElementById('custom-model-select').value;
+      const scaleMultiplier = parseFloat(document.getElementById('custom-scale-input').value || 1.0);
+      const elevation = parseFloat(document.getElementById('custom-elevation-input').value || 0.0);
+      const headingDeg = parseFloat(document.getElementById('custom-heading-input').value || 0);
+
+      // Sincronizar los textos de los sliders
+      document.getElementById('scale-val').innerText = `${scaleMultiplier.toFixed(1)}x`;
+      document.getElementById('elevation-val').innerText = `${elevation.toFixed(1)}m`;
+      document.getElementById('heading-val').innerText = `${headingDeg}°`;
+
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      // Eliminar anterior preview
+      if (previewEntity) {
+        viewer.entities.remove(previewEntity);
+        previewEntity = null;
+      }
+
+      const modelInfo = catalog.find(m => m.id === modelId) || catalog[0];
+      const baseScale = modelInfo.defaultScale ? modelInfo.defaultScale.x : 1.0;
+      const finalScaleValue = baseScale * scaleMultiplier;
+
+      const heading = Cesium.Math.toRadians(headingDeg);
+      const hpr = new Cesium.HeadingPitchRoll(heading, 0, 0);
+      const positionCartesian = Cesium.Cartesian3.fromDegrees(lng, lat, elevation);
+      const orientation = Cesium.Transforms.headingPitchRollQuaternion(positionCartesian, hpr);
+
+      previewEntity = viewer.entities.add({
+        name: 'Vista Previa Temporal',
+        position: positionCartesian,
+        orientation: orientation,
+        model: {
+          uri: `./assets/${modelInfo.file}`,
+          minimumPixelSize: 128,
+          maximumScale: 50
+        },
+        label: {
+          text: `⚡ Ajustando: ${modelInfo.name}`,
+          font: 'bold 13px Outfit, sans-serif',
+          fillColor: Cesium.Color.YELLOW,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cesium.Cartesian2(0, -60),
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        }
+      });
+    }
+
+    function setupSlidersText() {
+      const scaleSlider = document.getElementById('custom-scale-input');
+      const elevSlider = document.getElementById('custom-elevation-input');
+      const headSlider = document.getElementById('custom-heading-input');
+
+      scaleSlider.addEventListener('input', (e) => {
+        document.getElementById('scale-val').innerText = `${parseFloat(e.target.value).toFixed(1)}x`;
+      });
+      elevSlider.addEventListener('input', (e) => {
+        document.getElementById('elevation-val').innerText = `${parseFloat(e.target.value).toFixed(1)}m`;
+      });
+      headSlider.addEventListener('input', (e) => {
+        document.getElementById('heading-val').innerText = `${e.target.value}°`;
+      });
+    }
+
+    function savePosition() {
+      const nameInput = document.getElementById('custom-name-input');
+      const modelSelect = document.getElementById('custom-model-select');
+      const latInput = document.getElementById('custom-lat-input');
+      const lngInput = document.getElementById('custom-lng-input');
+      const scaleInput = document.getElementById('custom-scale-input');
+      const elevationInput = document.getElementById('custom-elevation-input');
+      const headingInput = document.getElementById('custom-heading-input');
+
+      const name = nameInput.value.trim();
+      const modelId = modelSelect.value;
+      const lat = parseFloat(latInput.value);
+      const lng = parseFloat(lngInput.value);
+      const scaleMultiplier = parseFloat(scaleInput.value || 1.0);
+      const elevation = parseFloat(elevationInput.value || 0.0);
+      const headingDeg = parseFloat(headingInput.value || 0);
+
+      if (isNaN(lat) || isNaN(lng)) {
+        alert('Por favor selecciona un punto en el mapa o ingresa coordenadas.');
+        return;
+      }
+
+      const positions = getPositions();
+      const modelInfo = catalog.find(m => m.id === modelId) || catalog[0];
+      const baseScale = modelInfo.defaultScale ? modelInfo.defaultScale.x : 1.0;
+      const finalScaleValue = baseScale * scaleMultiplier;
+
+      if (editingPositionId) {
+        // Modo Edición: Actualizar elemento existente
+        const idx = positions.findIndex(p => p.id === editingPositionId);
+        if (idx !== -1) {
+          positions[idx] = {
+            ...positions[idx],
+            nombre: name || `Posición ${idx + 1}`,
+            modelo: modelId,
+            lat: lat,
+            lng: lng,
+            defaultScale: { x: finalScaleValue, y: finalScaleValue, z: finalScaleValue },
+            defaultElevation: elevation,
+            scaleMultiplier: scaleMultiplier,
+            heading: headingDeg
+          };
+        }
+        editingPositionId = null;
+        const saveBtn = document.getElementById('save-btn');
+        saveBtn.innerHTML = `<i data-lucide="plus" style="width: 15px; height: 15px;"></i> Guardar Posición`;
+        document.getElementById('cancel-btn').style.display = 'none';
+      } else {
+        // Modo Creación: Añadir nuevo
+        positions.push({
+          id: 'custom_' + Date.now(),
+          nombre: name || `Posición ${positions.length + 1}`,
+          modelo: modelId,
+          lat: lat,
+          lng: lng,
+          defaultScale: { x: finalScaleValue, y: finalScaleValue, z: finalScaleValue },
+          defaultElevation: elevation,
+          scaleMultiplier: scaleMultiplier,
+          heading: headingDeg,
+          isCustom: true
+        });
+      }
+
+      localStorage.setItem('custom_positions', JSON.stringify(positions));
+
+      // Limpiar campos y vista previa
+      nameInput.value = '';
+      latInput.value = '';
+      lngInput.value = '';
+      scaleInput.value = '1.0';
+      elevationInput.value = '0.0';
+      headingInput.value = '0';
+      
+      document.getElementById('scale-val').innerText = '1.0x';
+      document.getElementById('elevation-val').innerText = '0.0m';
+      document.getElementById('heading-val').innerText = '0°';
+
+      if (previewEntity) {
+        viewer.entities.remove(previewEntity);
+        previewEntity = null;
+      }
+
+      // Refrescar lista e iconos
+      renderList();
+      drawModelsOnGlobe();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+      alert('Cambios guardados con éxito y sincronizados con la App de WebAR.');
+    }
+
+    function cancelEditing() {
+      editingPositionId = null;
+      
+      document.getElementById('custom-name-input').value = '';
+      document.getElementById('custom-lat-input').value = '';
+      document.getElementById('custom-lng-input').value = '';
+      document.getElementById('custom-scale-input').value = '1.0';
+      document.getElementById('custom-elevation-input').value = '0.0';
+      document.getElementById('custom-heading-input').value = '0';
+      
+      document.getElementById('scale-val').innerText = '1.0x';
+      document.getElementById('elevation-val').innerText = '0.0m';
+      document.getElementById('heading-val').innerText = '0°';
+
+      if (previewEntity) {
+        viewer.entities.remove(previewEntity);
+        previewEntity = null;
+      }
+
+      const saveBtn = document.getElementById('save-btn');
+      saveBtn.innerHTML = `<i data-lucide="plus" style="width: 15px; height: 15px;"></i> Guardar Posición`;
+      document.getElementById('cancel-btn').style.display = 'none';
+
+      drawModelsOnGlobe();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function editPosition(id) {
+      const positions = getPositions();
+      const pos = positions.find(p => p.id === id);
+      if (pos) {
+        editingPositionId = id;
+        
+        document.getElementById('custom-name-input').value = pos.nombre;
+        document.getElementById('custom-model-select').value = pos.modelo;
+        document.getElementById('custom-lat-input').value = pos.lat;
+        document.getElementById('custom-lng-input').value = pos.lng;
+        document.getElementById('custom-scale-input').value = pos.scaleMultiplier !== undefined ? pos.scaleMultiplier : 1.0;
+        document.getElementById('custom-elevation-input').value = pos.defaultElevation !== undefined ? pos.defaultElevation : 0.0;
+        document.getElementById('custom-heading-input').value = pos.heading !== undefined ? pos.heading : 0;
+
+        document.getElementById('scale-val').innerText = `${(pos.scaleMultiplier || 1.0).toFixed(1)}x`;
+        document.getElementById('elevation-val').innerText = `${(pos.defaultElevation || 0.0).toFixed(1)}m`;
+        document.getElementById('heading-val').innerText = `${pos.heading || 0}°`;
+
+        // Actualizar UI del botón
+        const saveBtn = document.getElementById('save-btn');
+        saveBtn.innerHTML = `<i data-lucide="check" style="width: 15px; height: 15px;"></i> Actualizar Posición`;
+        document.getElementById('cancel-btn').style.display = 'block';
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        // Ocultar de los modelos fijos para activar vista previa live
+        drawModelsOnGlobe();
+        updateLivePreview();
+
+        // Centrar cámara en el elemento a editar
+        flyToPosition(pos);
+      }
+    }
+
+    function deletePosition(id) {
+      if (confirm('¿Deseas eliminar esta posición permanentemente del globo y del mapa?')) {
+        let positions = getPositions();
+        positions = positions.filter(p => p.id !== id);
+        localStorage.setItem('custom_positions', JSON.stringify(positions));
+
+        if (editingPositionId === id) {
+          cancelEditing();
+        } else {
+          renderList();
+          drawModelsOnGlobe();
+        }
+      }
+    }
+
+    function flyToPosition(pos) {
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(pos.lng, pos.lat, 250),
+        orientation: {
+          heading: Cesium.Math.toRadians(pos.heading || 0),
+          pitch: Cesium.Math.toRadians(-45),
+          roll: 0.0
+        }
+      });
+    }
+
+    function renderList() {
+      const container = document.getElementById('positions-list');
+      if (!container) return;
+
+      const positions = getPositions();
+      if (positions.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 16px; border: 1px dashed var(--border-color); border-radius: 12px; background: rgba(0,0,0,0.1); width: 100%;">
+            No hay posiciones. Haz clic en el globo para añadir una.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = positions.map(pos => {
+        const modelInfo = catalog.find(m => m.id === pos.modelo) || { name: pos.modelo };
+        return `
+          <div class="pos-card" onclick="focusCard('${pos.id}')">
+            <div class="pos-card-info">
+              <span class="pos-card-name">${pos.nombre}</span>
+              <span class="pos-card-desc">
+                <span class="pos-card-emoji">${getEmoji(pos.modelo)}</span>
+                <span>${modelInfo.name}</span>
+                <span style="font-family: monospace; font-size: 9px; color: var(--accent-cyan);">${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}</span>
+              </span>
+            </div>
+            <div class="pos-card-actions" onclick="event.stopPropagation()">
+              <button class="btn-card-icon edit" onclick="editPos('${pos.id}')">
+                <i data-lucide="pencil" style="width: 13px; height: 13px;"></i>
+              </button>
+              <button class="btn-card-icon delete" onclick="deletePos('${pos.id}')">
+                <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function focusCard(id) {
+      const positions = getPositions();
+      const pos = positions.find(p => p.id === id);
+      if (pos) {
+        flyToPosition(pos);
+      }
+    }
+
+    function exportJSON() {
+      const dataStr = localStorage.getItem('custom_positions') || "[]";
+      navigator.clipboard.writeText(dataStr).then(() => {
+        alert('JSON de posiciones copiado al portapapeles. ¡Pégalo en el chat para compartirlo!');
+      }).catch(() => {
+        alert('No se pudo copiar automáticamente. Puedes exportar copiando el texto del almacenamiento.');
+      });
+    }
+
+    function importJSON() {
+      const jsonStr = prompt("Pega el JSON de posiciones aquí:");
+      if (!jsonStr) return;
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const listToImport = Array.isArray(parsed) ? parsed : [parsed];
+        const current = getPositions();
+
+        listToImport.forEach(pos => {
+          if (!pos.modelo || isNaN(parseFloat(pos.lat)) || isNaN(parseFloat(pos.lng))) {
+            throw new Error("Formato inválido.");
+          }
+
+          const modelInfo = catalog.find(m => m.id === pos.modelo) || catalog[0];
+          const scaleMult = pos.scaleMultiplier !== undefined ? parseFloat(pos.scaleMultiplier) : 1.0;
+          const baseScale = modelInfo.defaultScale ? modelInfo.defaultScale.x : 1.0;
+          const finalScale = baseScale * scaleMult;
+
+          current.push({
+            id: 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            nombre: (pos.nombre || 'Importado').trim(),
+            modelo: pos.modelo,
+            lat: parseFloat(pos.lat),
+            lng: parseFloat(pos.lng),
+            defaultScale: { x: finalScale, y: finalScale, z: finalScale },
+            defaultElevation: parseFloat(pos.defaultElevation !== undefined ? pos.defaultElevation : 0),
+            scaleMultiplier: scaleMult,
+            heading: parseFloat(pos.heading !== undefined ? pos.heading : 0),
+            isCustom: true
+          });
+        });
+
+        localStorage.setItem('custom_positions', JSON.stringify(current));
+        renderList();
+        drawModelsOnGlobe();
+        alert('Posiciones importadas y actualizadas con éxito.');
+      } catch (e) {
+        alert('Error al importar el JSON: ' + e.message);
+      }
+    }
+
+    // Exportar handlers al objeto window para llamadas onclick HTML
+    window.savePosition = savePosition;
+    window.cancelEditing = cancelEditing;
+    window.editPos = editPosition;
+    window.deletePos = deletePosition;
+    window.focusCard = focusCard;
+    window.exportJSON = exportJSON;
+    window.importJSON = importJSON;
+  </script>
+</body>
+</html>
