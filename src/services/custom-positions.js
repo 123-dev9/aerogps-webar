@@ -61,6 +61,37 @@ export class CustomPositionsService {
   }
 
   /**
+   * Actualiza una posición existente
+   */
+  updatePosition(id, name, modelId, lat, lng, scaleMultiplier = 1.0, elevation = 0.0) {
+    const positions = this.getPositions();
+    const idx = positions.findIndex(pos => pos.id === id);
+    if (idx !== -1) {
+      const modelCatalog = this.assetService.getCatalog();
+      const model = modelCatalog.find(m => m.id === modelId) || modelCatalog[0];
+      
+      const baseScale = model.defaultScale ? model.defaultScale.x : 1.0;
+      const finalScaleValue = baseScale * scaleMultiplier;
+
+      positions[idx] = {
+        ...positions[idx],
+        nombre: name.trim() || `Posición ${idx + 1}`,
+        modelo: modelId,
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        defaultScale: { x: finalScaleValue, y: finalScaleValue, z: finalScaleValue },
+        defaultElevation: parseFloat(elevation),
+        scaleMultiplier: parseFloat(scaleMultiplier)
+      };
+      
+      localStorage.setItem('custom_positions', JSON.stringify(positions));
+      this.monumentsService.loadCustomPositions();
+      return positions[idx];
+    }
+    return null;
+  }
+
+  /**
    * Elimina una posición específica
    */
   deletePosition(id) {

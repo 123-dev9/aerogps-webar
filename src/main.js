@@ -582,6 +582,8 @@ function stopAR() {
 // LOGICA DE POSICIONES PERSONALIZADAS (UI EVENT HANDLERS)
 // ====================================================
 
+let editingPositionId = null;
+
 function renderCustomPositionsList() {
   const listContainer = document.getElementById('custom-positions-list');
   if (!listContainer) return;
@@ -629,6 +631,9 @@ function renderCustomPositionsList() {
           </button>
           <button class="btn-card-action btn-card-map" onclick="showCustomPositionOnMap('${pos.id}')">
             <i data-lucide="map" style="width: 12px; height: 12px;"></i> Mapa
+          </button>
+          <button class="btn-card-action btn-card-edit" onclick="editCustomPosition('${pos.id}')" style="max-width: 36px; flex: none; color: #f59e0b; background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.2);">
+            <i data-lucide="pencil" style="width: 12px; height: 12px;"></i>
           </button>
           <button class="btn-card-action btn-card-delete" onclick="deleteCustomPosition('${pos.id}')">
             <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
@@ -716,16 +721,82 @@ function saveNewCustomPosition() {
     return;
   }
 
-  customPositionsService.savePosition(name, modelId, lat, lng, scaleMultiplier, elevation);
-  
-  // Limpiar campos
-  nameInput.value = '';
-  latInput.value = '';
-  lngInput.value = '';
-  scaleInput.value = '1.0';
-  elevationInput.value = '0.0';
+  if (editingPositionId) {
+    customPositionsService.updatePosition(editingPositionId, name, modelId, lat, lng, scaleMultiplier, elevation);
+    cancelEditing();
+    alert('Posición actualizada correctamente.');
+  } else {
+    customPositionsService.savePosition(name, modelId, lat, lng, scaleMultiplier, elevation);
+    alert('Posición guardada correctamente.');
+    
+    // Limpiar campos
+    nameInput.value = '';
+    latInput.value = '';
+    lngInput.value = '';
+    scaleInput.value = '1.0';
+    elevationInput.value = '0.0';
+  }
 
   renderCustomPositionsList();
+}
+
+function editCustomPosition(id) {
+  const positions = customPositionsService.getPositions();
+  const pos = positions.find(p => p.id === id);
+  if (pos) {
+    editingPositionId = id;
+    
+    // Cargar campos en el formulario
+    document.getElementById('custom-name-input').value = pos.nombre;
+    document.getElementById('custom-model-select').value = pos.modelo;
+    document.getElementById('custom-lat-input').value = pos.lat;
+    document.getElementById('custom-lng-input').value = pos.lng;
+    document.getElementById('custom-scale-input').value = pos.scaleMultiplier !== undefined ? pos.scaleMultiplier : 1.0;
+    document.getElementById('custom-elevation-input').value = pos.defaultElevation !== undefined ? pos.defaultElevation : 0.0;
+    
+    // Cambiar el botón principal y añadir el de cancelar
+    const saveBtn = document.querySelector('#custom-positions-view .btn-primary');
+    if (saveBtn) {
+      saveBtn.innerHTML = `<i data-lucide="check" style="width: 16px; height: 16px;"></i> Actualizar Posición`;
+      
+      let cancelEditBtn = document.getElementById('cancel-edit-btn');
+      if (!cancelEditBtn) {
+        cancelEditBtn = document.createElement('button');
+        cancelEditBtn.id = 'cancel-edit-btn';
+        cancelEditBtn.className = 'btn';
+        cancelEditBtn.style.cssText = 'width: 100%; margin-top: 8px; border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); color: #f87171;';
+        cancelEditBtn.innerHTML = `<i data-lucide="x" style="width: 15px; height: 15px;"></i> Cancelar Edición`;
+        saveBtn.parentNode.insertBefore(cancelEditBtn, saveBtn.nextSibling);
+        
+        cancelEditBtn.onclick = () => {
+          cancelEditing();
+        };
+      }
+    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    // Subir scroll al formulario
+    document.getElementById('custom-positions-view').scrollTop = 0;
+  }
+}
+
+function cancelEditing() {
+  editingPositionId = null;
+  document.getElementById('custom-name-input').value = '';
+  document.getElementById('custom-lat-input').value = '';
+  document.getElementById('custom-lng-input').value = '';
+  document.getElementById('custom-scale-input').value = '1.0';
+  document.getElementById('custom-elevation-input').value = '0.0';
+  
+  const saveBtn = document.querySelector('#custom-positions-view .btn-primary');
+  if (saveBtn) {
+    saveBtn.innerHTML = `<i data-lucide="plus" style="width: 16px; height: 16px;"></i> Guardar Posición`;
+  }
+  
+  const cancelBtn = document.getElementById('cancel-edit-btn');
+  if (cancelBtn) cancelBtn.remove();
+  
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function deleteCustomPosition(id) {
@@ -752,6 +823,7 @@ function startCustomPositionAR(id) {
   }
 }
 
+// Exponer funciones globales
 function showCustomPositionOnMap(id) {
   const positions = customPositionsService.getPositions();
   const pos = positions.find(p => p.id === id);
@@ -809,6 +881,8 @@ window.renderCustomPositionsList = renderCustomPositionsList;
 window.getCustomCurrentGPS = getCustomCurrentGPS;
 window.setCustomOffsetGPS = setCustomOffsetGPS;
 window.saveNewCustomPosition = saveNewCustomPosition;
+window.editCustomPosition = editCustomPosition;
+window.cancelEditing = cancelEditing;
 window.deleteCustomPosition = deleteCustomPosition;
 window.startCustomPositionAR = startCustomPositionAR;
 window.showCustomPositionOnMap = showCustomPositionOnMap;
